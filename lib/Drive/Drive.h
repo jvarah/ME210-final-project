@@ -21,6 +21,7 @@ class Drive {
   void stopMotors();
   double getAngle();
   void setGyroOffset(double offset);
+  void initGyro(Adafruit_BNO055 *gyro_ptr);
 
  private:
   bool isLeftInverted();
@@ -29,16 +30,18 @@ class Drive {
   bool rightDir();
   void setRightDir(uint8_t dir);
   void setLeftDir(uint8_t dir);
+  void Drive::setGyroInit();
+  bool Drive::getGyroInit();
   uint8_t l_dir_port;
   uint8_t l_en_port;
   uint8_t r_dir_port;
   uint8_t r_en_port;
 
   /* Structure of invertsAndState:
-    0, 0, 0, 0, LeftInverted, RightInverted, LeftDir, RightDir
+    0, 0, 0, gyroInitialized, LeftInverted, RightInverted, LeftDir, RightDir
       */
   uint8_t inverts_and_states;  // Each bit is different info
-  Adafruit_BNO055 gyro;
+  Adafruit_BNO055 *gyro;
   double gyro_offset;
 };
 
