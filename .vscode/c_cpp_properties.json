@@ -10,13 +10,19 @@
             "includePath": [
                 "/Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/include",
                 "/Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/src",
+                "/Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/lib/Drive",
+                "/Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/.pio/libdeps/uno/TimerInterrupt/src",
+                "/Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/.pio/libdeps/uno/Adafruit BNO055",
+                "/Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/.pio/libdeps/uno/Adafruit BNO055/utility",
+                "/Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/.pio/libdeps/uno/Adafruit Unified Sensor",
+                "/Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/.pio/libdeps/uno/Adafruit BusIO",
+                "/Users/jamesvarah/.platformio/packages/framework-arduino-avr/libraries/SPI/src",
+                "/Users/jamesvarah/.platformio/packages/framework-arduino-avr/libraries/Wire/src",
                 "/Users/jamesvarah/.platformio/packages/framework-arduino-avr/cores/arduino",
                 "/Users/jamesvarah/.platformio/packages/framework-arduino-avr/variants/standard",
                 "/Users/jamesvarah/.platformio/packages/framework-arduino-avr/libraries/EEPROM/src",
                 "/Users/jamesvarah/.platformio/packages/framework-arduino-avr/libraries/HID/src",
-                "/Users/jamesvarah/.platformio/packages/framework-arduino-avr/libraries/SPI/src",
                 "/Users/jamesvarah/.platformio/packages/framework-arduino-avr/libraries/SoftwareSerial/src",
-                "/Users/jamesvarah/.platformio/packages/framework-arduino-avr/libraries/Wire/src",
                 ""
             ],
             "browse": {
@@ -24,13 +30,19 @@
                 "path": [
                     "/Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/include",
                     "/Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/src",
+                    "/Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/lib/Drive",
+                    "/Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/.pio/libdeps/uno/TimerInterrupt/src",
+                    "/Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/.pio/libdeps/uno/Adafruit BNO055",
+                    "/Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/.pio/libdeps/uno/Adafruit BNO055/utility",
+                    "/Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/.pio/libdeps/uno/Adafruit Unified Sensor",
+                    "/Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/.pio/libdeps/uno/Adafruit BusIO",
+                    "/Users/jamesvarah/.platformio/packages/framework-arduino-avr/libraries/SPI/src",
+                    "/Users/jamesvarah/.platformio/packages/framework-arduino-avr/libraries/Wire/src",
                     "/Users/jamesvarah/.platformio/packages/framework-arduino-avr/cores/arduino",
                     "/Users/jamesvarah/.platformio/packages/framework-arduino-avr/variants/standard",
                     "/Users/jamesvarah/.platformio/packages/framework-arduino-avr/libraries/EEPROM/src",
                     "/Users/jamesvarah/.platformio/packages/framework-arduino-avr/libraries/HID/src",
-                    "/Users/jamesvarah/.platformio/packages/framework-arduino-avr/libraries/SPI/src",
                     "/Users/jamesvarah/.platformio/packages/framework-arduino-avr/libraries/SoftwareSerial/src",
-                    "/Users/jamesvarah/.platformio/packages/framework-arduino-avr/libraries/Wire/src",
                     ""
                 ]
             },
