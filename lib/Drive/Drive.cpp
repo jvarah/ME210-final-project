@@ -18,7 +18,8 @@
 #define FORWARD (uint8_t)0
 #define BACKWARD (uint8_t)1
 
-#define GYRO_DEGREES 360.0 // Max value from gyro (0 - 359.9999)
+#define GYRO_DEGREES 360.0  // Max value from gyro (0 - 359.9999)
+#define GYRO_HALF_DEGREES (GYRO_DEGREES / 2)
 
 Drive::Drive() {
   // Ports default to garbage values
@@ -46,7 +47,6 @@ Drive::Drive(uint8_t left_dir_port, uint8_t left_en_port,
   l_en_port = left_en_port;
   r_dir_port = right_dir_port;
   r_en_port = right_en_port;
-  
 
   pinMode(l_dir_port, OUTPUT);
   pinMode(l_en_port, OUTPUT);
@@ -171,19 +171,29 @@ void Drive::stopMotors() {
 
 double Drive::getAngle() {
   if (getGyroInit()) {
-    double yaw = gyro.getVector(Adafruit_BNO055::VECTOR_EULER).x() - gyro_offset;
+    double yaw =
+        gyro.getVector(Adafruit_BNO055::VECTOR_EULER).x() - gyro_offset;
 
-    // Get a range from [0, 360.0) with offset (if offset is 50, want 0 (-50) to now map to 310.0)
+    // Get a range from [0, 360.0) with offset (if offset is 50, want 0 (-50) to
+    // now map to 310.0)
     if (yaw < 0) {
       return yaw + GYRO_DEGREES;
     } else {
       return yaw;
-    } 
-  } 
-  return -1; // Error, gyro not initialized
+    }
+  }
+  return -1;  // Error, gyro not initialized
 }
 
 void Drive::setGyroOffset(double offset) {
   gyro_offset = offset;  // Can be used so 0 is always when the robot IR sensor
                          // is facing the beacon
+}
+
+double Drive::calcTurnError(double target_angle) {
+  double error = target_angle - getAngle();
+  if (error > GYRO_HALF_DEGREES) {
+    error -= GYRO_DEGREES;
+  }
+  return error;
 }

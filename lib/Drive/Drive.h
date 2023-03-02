@@ -22,6 +22,7 @@ class Drive {
   void stopMotors();
   double getAngle();
   void setGyroOffset(double offset);
+  double calcTurnError(double target_angle);
 
  private:
   bool isLeftInverted();

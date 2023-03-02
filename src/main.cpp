@@ -29,6 +29,10 @@ static Drive drivebase;
 
 #define GYRO_PORT 0x28
 
+// PID Constants
+#define MAX_TURN_ERROR 1.0 // Degrees
+// #define TURN_K_P 1/180.0 // Full motor output at the max error (need to do a full turn)
+
 typedef enum {
   DRIVE_FORWARD,
   TURN_RIGHT,
@@ -125,32 +129,37 @@ void driveTest() {
   Serial.println("Stopped motors");
   delay(500);
 
-  // Turn 90 degrees right (roughly)
+  // Turn to (roughly) 90 degrees
   Serial.println("Turning right 90 deg");
   drivebase.setLeftPower(HALF_SPEED);
   drivebase.setRightPower(-HALF_SPEED);
   uint8_t count = 0;
-  while (drivebase.getAngle() < 90) {  // Turn until 90 degrees
+  uint8_t target = 90;
+  double error = 0.0;
+  do {
+    error = drivebase.calcTurnError(target);
     if (count == 0) {                  // Print every 255 cycles
       Serial.println(drivebase.getAngle());
     }
     count++;
-  }
+  } while (abs(error) >= MAX_TURN_ERROR * 10);
   drivebase.stopMotors();
   delay(500);
 
-  // Turn 45 degrees left (roughly)
-  Serial.println("Turning left 90 deg");
-  double lastAngle = drivebase.getAngle();
+  // Turn (roughly) to 45 degrees
+  Serial.println("Turning left 45 deg");
+  target = 45;
   drivebase.setLeftPower(-HALF_SPEED);
   drivebase.setRightPower(HALF_SPEED);
-  // TODO: Find a way to determine diff between 360 and 0
-  while (lastAngle - drivebase.getAngle() < 45) {
-    if (count == 0) {
+  
+  // Keep turning until you got there
+  do {
+    error = drivebase.calcTurnError(target);
+    if (count == 0) {                  // Print every 255 cycles
       Serial.println(drivebase.getAngle());
     }
     count++;
-  }  // Turn until 90 degrees
+  } while (abs(error) >= MAX_TURN_ERROR * 10);
   drivebase.stopMotors();
   delay(500);
 
@@ -158,5 +167,5 @@ void driveTest() {
   // Drive straight at full power
   drivebase.setLeftPower(FULL_SPEED);
   drivebase.setRightPower(FULL_SPEED);
-  delay(10000);
+  delay(1000);
 }
