@@ -33,13 +33,18 @@ static Drive drivebase;
 #define MAX_TURN_ERROR 1.0 // Degrees
 // #define TURN_K_P 1/180.0 // Full motor output at the max error (need to do a full turn)
 
+// Beacon sensing constants
+#define IR_SENSE_PORT_1 12
+#define IR_SENSE_PORT_2 13
+
 typedef enum {
   DRIVE_FORWARD,
   TURN_RIGHT,
   TURN_LEFT,
   STOP,
   DRIVE_BACKWARD,
-  NOTHING
+  NOTHING,
+  FINDING_MAX_IR_SIGNAL
 } States_t;
 
 static States_t state = NOTHING;
@@ -67,6 +72,10 @@ void setup() {
   isDriving = false;
 
   Serial.println("Drivebase initialized");
+
+  // Init IR sensors
+  pinMode(IR_SENSE_PORT_1, INPUT);
+  pinMode(IR_SENSE_PORT_2, INPUT);
 }
 
 void loop() {
@@ -109,7 +118,22 @@ void loop() {
       case 103: // g
         drivebase.setGyroOffset(drivebase.getAngle()); // Zero the gyro
         break;
+      case 105: // i
+        state = FINDING_MAX_IR_SIGNAL;
+        drivebase.setLeftPower(HALF_SPEED);
+        drivebase.setRightPower(-HALF_SPEED);
     }
+  }
+
+  switch (state) {
+    case FINDING_MAX_IR_SIGNAL:
+      // When both IR sensors detect light, we are oriented correctly
+      if (digitalRead(IR_SENSE_PORT_1) && digitalRead(IR_SENSE_PORT_2)) {
+        drivebase.stopMotors();
+        drivebase.setGyroOffset(drivebase.getAngle());
+        // TODO: Set state to drive to studio
+        state = NOTHING;
+      }
   }
 
   // Periodic print without using Timer2 (which messes with deploying the code)
