@@ -18,17 +18,35 @@
 #define FORWARD (uint8_t)0
 #define BACKWARD (uint8_t)1
 
+#define GYRO_DEGREES 360.0 // Max value from gyro (0 - 359.9999)
+
+Drive::Drive() {
+  // Ports default to garbage values
+  inverts_and_states = 0;
+}
+
 Drive::Drive(uint8_t left_dir_port, uint8_t left_en_port,
-             uint8_t right_dir_port, uint8_t right_en_port) {
+             uint8_t right_dir_port, uint8_t right_en_port, uint8_t gyro_prt) {
+  // State initialization
+  inverts_and_states = 0;
+
   // Gyro initialization
   gyro_offset = 0;
+  gyro_port = gyro_prt;
+
+  // Init gyro to pass to drivebase
+  if (!gyro.begin()) {
+    Serial.println("No gyro detected");
+  }
+  gyro.setExtCrystalUse(true);
+  setGyroInit();
 
   // Motor initialization
-  inverts_and_states = 0;
   l_dir_port = left_dir_port;
   l_en_port = left_en_port;
   r_dir_port = right_dir_port;
   r_en_port = right_en_port;
+  
 
   pinMode(l_dir_port, OUTPUT);
   pinMode(l_en_port, OUTPUT);
@@ -42,13 +60,6 @@ Drive::Drive(uint8_t left_dir_port, uint8_t left_en_port,
   setLeftDir(FORWARD);
   setRightDir(FORWARD);
   stopMotors();
-}
-
-void Drive::initGyro(Adafruit_BNO055 *gyro_ptr) {
-  if (gyro_ptr != NULL) {
-    gyro = gyro_ptr;
-    setGyroInit();
-  }
 }
 
 // Set direction of the motors
@@ -160,10 +171,16 @@ void Drive::stopMotors() {
 
 double Drive::getAngle() {
   if (getGyroInit()) {
-    imu::Vector<3> euler = gyro->getVector(Adafruit_BNO055::VECTOR_EULER);
-    return euler.x() - gyro_offset;  // Yaw
+    double yaw = gyro.getVector(Adafruit_BNO055::VECTOR_EULER).x() - gyro_offset;
+
+    // Get a range from [0, 360.0) with offset (if offset is 50, want 0 (-50) to now map to 310.0)
+    if (yaw < 0) {
+      return yaw + GYRO_DEGREES;
+    } else {
+      return yaw;
+    } 
   } 
-  return -1; // Error
+  return -1; // Error, gyro not initialized
 }
 
 void Drive::setGyroOffset(double offset) {

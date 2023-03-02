@@ -17,19 +17,17 @@
 #define RIGHT_MOTOR_EN_PORT 5
 #define RIGHT_MOTOR_DIR_PORT 4
 
-#define IS_LEFT_INVERTED 1 // was 0
-#define IS_RIGHT_INVERTED 0 // was 1
+#define IS_LEFT_INVERTED 1   // was 0
+#define IS_RIGHT_INVERTED 0  // was 1
 
 #define FULL_SPEED 127
 #define HALF_SPEED 64  // 64 // Max forward is 127
 
 #define IS_TESTING_DRIVE 0  // Set to 1 to test the driving
 static bool isDriving;
-static Drive drivebase = Drive(LEFT_MOTOR_DIR_PORT, LEFT_MOTOR_EN_PORT,
-                               RIGHT_MOTOR_DIR_PORT, RIGHT_MOTOR_EN_PORT);
+static Drive drivebase;
 
 #define GYRO_PORT 0x28
-static Adafruit_BNO055 gyro = Adafruit_BNO055(GYRO_PORT);
 
 typedef enum {
   DRIVE_FORWARD,
@@ -51,19 +49,15 @@ void outputSensorVals() {
 
 void setup() {
   Serial.begin(9600);
-  while (!Serial);
+  while (!Serial)
+    ;
 
   Serial.println("Code started");
 
-  // Init gyro to pass to drivebase
-  if (!gyro.begin()) {
-    Serial.println("No gyro detected");
-    while (1);
-  }
-  gyro.setExtCrystalUse(true);
-  drivebase.initGyro(&gyro); // TODO: Maybe not include gyro in the drivebase?
-
   // Init drivebase
+  drivebase = Drive(LEFT_MOTOR_DIR_PORT, LEFT_MOTOR_EN_PORT,
+                    RIGHT_MOTOR_DIR_PORT, RIGHT_MOTOR_EN_PORT, GYRO_PORT);
+
   drivebase.setLeftInverted(IS_LEFT_INVERTED);
   drivebase.setRightInverted(IS_RIGHT_INVERTED);
   isDriving = false;
@@ -72,12 +66,14 @@ void setup() {
 }
 
 void loop() {
-  // if (IS_TESTING_DRIVE && !isDriving) {
-  //   isDriving = true;
-  //   driveTest();
-  // }
+  // End to end drive test
+  if (IS_TESTING_DRIVE && !isDriving) {
+    isDriving = true;
+    driveTest();
+  }
 
   // Test forwards, backwards, left right
+  // For drive testing (no gyro)
   if (Serial.available()) {
     uint8_t aKey = Serial.read();
     Serial.println(aKey);
@@ -106,12 +102,16 @@ void loop() {
         drivebase.setLeftPower(FULL_SPEED);
         drivebase.setRightPower(-FULL_SPEED);
         break;
+      case 103: // g
+        drivebase.setGyroOffset(drivebase.getAngle()); // Zero the gyro
+        break;
     }
   }
 
-  // if (millis() % 1000L == 0) {
-  //   outputSensorVals();
-  // }
+  // Periodic print without using Timer2 (which messes with deploying the code)
+  if (millis() % 1000L == 0) {
+    outputSensorVals();
+  }
 }
 
 // Note: Very bad style, uses delay which stops program execution
