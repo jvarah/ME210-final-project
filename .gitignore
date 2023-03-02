@@ -32,5 +32,4 @@
 *.app
 
 # Platform IO downloads
-.pio/libdeps
-.pio/build/uno
+.pio
