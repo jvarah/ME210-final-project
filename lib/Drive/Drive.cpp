@@ -190,6 +190,10 @@ void Drive::setGyroOffset(double offset) {
                          // is facing the beacon
 }
 
+/**
+ * Get the turn error (to use for PID turning), limited from -180 to 180.
+ * @param target_angle must be between 0 and 359 (absolute target)
+*/
 double Drive::calcTurnError(double target_angle) {
   double error = target_angle - getAngle();
   if (error > GYRO_HALF_DEGREES) {
