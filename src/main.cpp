@@ -33,6 +33,15 @@ static Drive drivebase;
 #define MAX_TURN_ERROR 1.0 // Degrees
 // #define TURN_K_P 1/180.0 // Full motor output at the max error (need to do a full turn)
 
+// Tape sensing
+#define CETNER_TAPE_PORT A3 // Input for tape signal
+
+// Measured 3/2/23 at 11:18pm
+// ~4-5 mm between the bottom of the shielding and the bottom of the tape sensor
+// Using a Vce of 2.5V with transresistive amplifier, 10k gain resistor, 5V input to LED
+#define MAX_WHITE_VOLTAGE 180 // This and below, white surface
+#define MIN_BLACK_VOLTAGE 390 // This and above, black surface
+
 typedef enum {
   DRIVE_FORWARD,
   TURN_RIGHT,
@@ -49,6 +58,8 @@ void driveTest();
 void outputSensorVals() {
   Serial.print("Gyro angle: ");
   Serial.println(drivebase.getAngle());
+  Serial.print("Center tape sensor value: ");
+  Serial.println(analogRead(CETNER_TAPE_PORT));
 }
 
 void setup() {
