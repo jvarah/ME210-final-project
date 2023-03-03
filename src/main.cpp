@@ -31,11 +31,19 @@ static Drive drivebase;
 
 // PID Constants
 #define MAX_TURN_ERROR 1.0 // Degrees
-// #define TURN_K_P 1/180.0 // Full motor output at the max error (need to do a full turn)
+#define TURN_K_P 1/180.0 // Full motor output at the max error (need to do a full turn)
+
+static double turn_k_p = TURN_K_P;
 
 // Beacon sensing constants
-#define IR_SENSE_PORT_1 12
-#define IR_SENSE_PORT_2 13
+#define IR_SENSE_PORT_1 A0
+#define IR_SENSE_PORT_2 A1
+
+#define MIN_FAR_BEACON_READ_WHEN_ALIGNED 100 // Value you can read from the IR sensor when its positioned across the entire field from its IR beacon (but more than ambient light)
+
+static int16_t max_ir_signal;
+static double max_ir_signal_angle;
+static double ir_signal_find_turn_target;
 
 typedef enum {
   DRIVE_FORWARD,
@@ -44,7 +52,8 @@ typedef enum {
   STOP,
   DRIVE_BACKWARD,
   NOTHING,
-  FINDING_MAX_IR_SIGNAL
+  FINDING_MAX_IR_SIGNAL,
+  TURNING_TO_MAX_IR_SIGNAL,
 } States_t;
 
 static States_t state = NOTHING;
@@ -54,6 +63,10 @@ void driveTest();
 void outputSensorVals() {
   Serial.print("Gyro angle: ");
   Serial.println(drivebase.getAngle());
+  Serial.print("IR Beacon 1: ");
+  Serial.println(analogRead(IR_SENSE_PORT_1));
+  Serial.print("IR Beacon 2: ");
+  Serial.println(analogRead(IR_SENSE_PORT_2));
 }
 
 void setup() {
@@ -120,13 +133,38 @@ void loop() {
         break;
       case 105: // i
         state = FINDING_MAX_IR_SIGNAL;
+        ir_signal_find_turn_target = drivebase.getAngle();
         drivebase.setLeftPower(HALF_SPEED);
         drivebase.setRightPower(-HALF_SPEED);
+        break;
+      case 112: // p
+        turn_k_p *= 2;
+        Serial.print("New turn p: ");
+        Serial.println(turn_k_p);
+        break;
+      case 111: // o 
+        turn_k_p /= 2;
+        Serial.print("New turn p: ");
+        Serial.println(turn_k_p);
+        break;
     }
   }
 
   switch (state) {
     case FINDING_MAX_IR_SIGNAL:
+      uint16_t signal = analogRead(IR_SENSE_PORT_1);
+      if (signal > max_ir_signal) {
+        max_ir_signal = signal;
+        max_ir_signal_angle = drivebase.getAngle();
+      }
+      // Check if has turned 360 degrees
+      double angle = drivebase.getAngle();
+      // Turn 360 degrees?
+      if (angle < ir_signal_find_turn_target && angle > (ir_signal_find_turn_target - MAX_TURN_ERROR)) {
+        state = TURNING_TO_MAX_IR_SIGNAL;
+        drivebase.stopMotors();
+      }
+
       // When both IR sensors detect light, we are oriented correctly
       if (digitalRead(IR_SENSE_PORT_1) && digitalRead(IR_SENSE_PORT_2)) {
         drivebase.stopMotors();
@@ -134,6 +172,27 @@ void loop() {
         // TODO: Set state to drive to studio
         state = NOTHING;
       }
+      break;
+    case TURNING_TO_MAX_IR_SIGNAL:
+      // Turn to maxIR signal
+      double error = drivebase.calcTurnError(max_ir_signal_angle);
+      // PID turn until into threshold
+      if (abs(error) > MAX_TURN_ERROR) {
+        drivebase.setLeftPower(TURN_K_P * error);
+        drivebase.setRightPower(-TURN_K_P * error);
+      } else {
+        drivebase.stopMotors();
+        drivebase.setGyroOffset(drivebase.getAngle());
+        state = NOTHING;
+        // Sanity check, see that the other beacon doesn't detect near zero
+        uint16_t other_sensor_value = analogRead(IR_SENSE_PORT_2);
+        Serial.print("Far beacon reads: ");
+        Serial.println(other_sensor_value);
+        // if (analogRead(IR_SENSE_PORT_2) > MIN_FAR_BEACON_READ_WHEN_ALIGNED) {
+            // Do something saying that you are in the correct orientation
+        // }
+      }
+      break;
   }
 
   // Periodic print without using Timer2 (which messes with deploying the code)
