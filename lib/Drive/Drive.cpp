@@ -35,12 +35,12 @@ Drive::Drive(uint8_t left_dir_port, uint8_t left_en_port,
   gyro_offset = 0;
   gyro_port = gyro_prt;
 
-  // Init gyro to pass to drivebase
-  if (!gyro.begin()) {
-    Serial.println("No gyro detected");
-  }
-  gyro.setExtCrystalUse(true);
-  setGyroInit();
+  // // Init gyro to pass to drivebase
+  // if (!gyro.begin()) {
+  //   Serial.println("No gyro detected");
+  // }
+  // gyro.setExtCrystalUse(true);
+  // setGyroInit();
 
   // Motor initialization
   l_dir_port = left_dir_port;

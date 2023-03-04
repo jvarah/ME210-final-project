@@ -33,3 +33,5 @@
 
 # Platform IO downloads
 .pio
+
+.vscode

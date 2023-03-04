@@ -123,23 +123,22 @@ void setup() {
   Serial.println("Code started");
 
   // // Init drivebase
-  // drivebase = Drive(LEFT_MOTOR_DIR_PORT, LEFT_MOTOR_EN_PORT,
-  //                   RIGHT_MOTOR_DIR_PORT, RIGHT_MOTOR_EN_PORT, GYRO_PORT);
+  drivebase = Drive(LEFT_MOTOR_DIR_PORT, LEFT_MOTOR_EN_PORT,
+                    RIGHT_MOTOR_DIR_PORT, RIGHT_MOTOR_EN_PORT, GYRO_PORT);
 
-  // drivebase.setLeftInverted(IS_LEFT_INVERTED);
-  // drivebase.setRightInverted(IS_RIGHT_INVERTED);
-  // isDriving = false;
+  drivebase.setLeftInverted(IS_LEFT_INVERTED);
+  drivebase.setRightInverted(IS_RIGHT_INVERTED);
+  isDriving = false;
 
-  // Serial.println("Drivebase initialized");
+  Serial.println("Drivebase initialized");
 }
 
 void loop() {
-  /*
-  // End to end drive test
-  if (IS_TESTING_DRIVE && !isDriving) {
-    isDriving = true;
-    driveTest();
-  }
+  // // End to end drive test
+  // if (IS_TESTING_DRIVE && !isDriving) {
+  //   isDriving = true;
+  //   driveTest();
+  // }
 
   // Test forwards, backwards, left right
   // For drive testing (no gyro)
@@ -165,19 +164,22 @@ void loop() {
       //   double new_p = Serial.parseFloat();
       //   printUpdateAndChange(k_p_turn, new_p);
       //   break;
-      case 119:  // w for white tape thresh
-        Serial.println("Input a new value for max white: ");
-        while (!Serial.available())
-          ;
-        uint16_t new_white_thresh = Serial.parseInt();
-        printUpdateAndChange(max_white, new_white_thresh);
-        break;
-      case 98:  // b for black
-        Serial.println("Input a new value for min black: ");
-        while (!Serial.available())
-          ;
-        uint16_t new_black_thresh = Serial.parseInt();
-        printUpdateAndChange(min_black, new_black_thresh);
+      // case 119:  // w for white tape thresh
+      //   Serial.println("Input a new value for max white: ");
+      //   while (!Serial.available())
+      //     ;
+      //   uint16_t new_white_thresh = Serial.parseInt();
+      //   printUpdateAndChange(max_white, new_white_thresh);
+      //   break;
+      case 98:  // b for backwards
+        state = DRIVE_BACKWARD;
+        drivebase.setLeftPower(-FULL_SPEED);
+        drivebase.setRightPower(-FULL_SPEED);
+        // Serial.println("Input a new value for min black: ");
+        // while (!Serial.available())
+        //   ;
+        // uint16_t new_black_thresh = Serial.parseInt();
+        // printUpdateAndChange(min_black, new_black_thresh);
         break;
       // case 100:  // d for diff
       //   Serial.println("Input a new value for center to side difference: ");
@@ -194,6 +196,7 @@ void loop() {
         break;
       case 102:  // f
         state = DRIVE_FORWARD;
+        Serial.println("forward plz?");
         drivebase.setLeftPower(FULL_SPEED);
         drivebase.setRightPower(FULL_SPEED);
         break;
@@ -221,26 +224,26 @@ void loop() {
     }
   }
 
-  switch (state) {
-    case EXITING_STUDIO:
-      handleExitStudio(GOOD_PRESS);  // TODO: Test bad presss
-      break;
-    case DISPENSE_ONE_BALL:
-      // TODO: Replace this with the servo code once ready
-      delay(1000);
-      // TODO: Add going from good to bad or something, depending on the target
-      state = NOTHING;
-      break;
-    case DRIVING_STUDIO_TO_BAD:
-      handleStudioToBad();
-      break;
-    case DRIVING_STUDIO_TO_GOOD:
-      handleStudioToGood();
-      break;
-    default:
-      break;  // Don't really care about the other states here
-  }
-  */
+  // switch (state) {
+  //   case EXITING_STUDIO:
+  //     handleExitStudio(GOOD_PRESS);  // TODO: Test bad presss
+  //     break;
+  //   case DISPENSE_ONE_BALL:
+  //     // TODO: Replace this with the servo code once ready
+  //     delay(1000);
+  //     // TODO: Add going from good to bad or something, depending on the target
+  //     state = NOTHING;
+  //     break;
+  //   case DRIVING_STUDIO_TO_BAD:
+  //     handleStudioToBad();
+  //     break;
+  //   case DRIVING_STUDIO_TO_GOOD:
+  //     handleStudioToGood();
+  //     break;
+  //   default:
+  //     break;  // Don't really care about the other states here
+  // }
+
   // Periodic print without using Timer2 (which messes with deploying the code)
   if (millis() % 1000L == 0) {
     Serial.println("Outputting");
