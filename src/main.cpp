@@ -122,18 +122,19 @@ void setup() {
 
   Serial.println("Code started");
 
-  // Init drivebase
-  drivebase = Drive(LEFT_MOTOR_DIR_PORT, LEFT_MOTOR_EN_PORT,
-                    RIGHT_MOTOR_DIR_PORT, RIGHT_MOTOR_EN_PORT, GYRO_PORT);
+  // // Init drivebase
+  // drivebase = Drive(LEFT_MOTOR_DIR_PORT, LEFT_MOTOR_EN_PORT,
+  //                   RIGHT_MOTOR_DIR_PORT, RIGHT_MOTOR_EN_PORT, GYRO_PORT);
 
-  drivebase.setLeftInverted(IS_LEFT_INVERTED);
-  drivebase.setRightInverted(IS_RIGHT_INVERTED);
-  isDriving = false;
+  // drivebase.setLeftInverted(IS_LEFT_INVERTED);
+  // drivebase.setRightInverted(IS_RIGHT_INVERTED);
+  // isDriving = false;
 
-  Serial.println("Drivebase initialized");
+  // Serial.println("Drivebase initialized");
 }
 
 void loop() {
+  /*
   // End to end drive test
   if (IS_TESTING_DRIVE && !isDriving) {
     isDriving = true;
@@ -239,15 +240,16 @@ void loop() {
     default:
       break;  // Don't really care about the other states here
   }
-
+  */
   // Periodic print without using Timer2 (which messes with deploying the code)
   if (millis() % 1000L == 0) {
+    Serial.println("Outputting");
     outputSensorVals();
   }
 }
 
 void outputSensorVals() {
-  drivebase.printDebug();
+  //drivebase.printDebug();
   lineFollow.printDebug();
 }
 
