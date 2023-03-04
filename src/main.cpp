@@ -104,6 +104,8 @@ static uint16_t max_white = MAX_WHITE_VOLTAGE;
 static uint16_t min_black = MIN_BLACK_VOLTAGE;
 static uint16_t center_to_side_diff = CENTER_TO_SIDE_DIFFERENCE;
 
+#define IR_SENSE_1 A0
+
 void driveTest();
 void handleExitStudio(Score_targets_t press_target);
 void followLine();
@@ -130,6 +132,7 @@ void setup() {
   drivebase.setRightInverted(IS_RIGHT_INVERTED);
   isDriving = false;
 
+  pinMode(IR_SENSE_1, INPUT);
   Serial.println("Drivebase initialized");
 }
 
@@ -254,6 +257,8 @@ void loop() {
 void outputSensorVals() {
   //drivebase.printDebug();
   lineFollow.printDebug();
+  Serial.print("IR sensor");
+  Serial.println(analogRead(IR_SENSE_1));
 }
 
 // Output the change between and old and new value, and overwrite the old value
