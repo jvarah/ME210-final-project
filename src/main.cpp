@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <Drive.h>
 #include <SPI.h>
+#include <Hopper.h>
 
 // Setup the hardware timer constants, needs to be before #include
 // TimerInterrupt
@@ -30,8 +31,15 @@ static Drive drivebase;
 #define GYRO_PORT 0x28
 
 // PID Constants
-#define MAX_TURN_ERROR 1.0 // Degrees
-// #define TURN_K_P 1/180.0 // Full motor output at the max error (need to do a full turn)
+#define MAX_TURN_ERROR 1.0  // Degrees
+// #define TURN_K_P 1/180.0 // Full motor output at the max error (need to do a
+// full turn)
+
+// Servo constants
+#define HOPPER_BOT_SERVO 11
+#define INDICATOR_SERVO 3
+#define SERVO_MAX_ANGLE 180
+#define SERVO_MIN_ANGLE 0
 
 typedef enum {
   DRIVE_FORWARD,
@@ -44,12 +52,22 @@ typedef enum {
 
 static States_t state = NOTHING;
 
+#define NUM_SERVOS 2
+#define INDICATOR_STEPS 3
+#define MOVE_INDICATOR_TIME 5000 // 5 Seconds
+
+static Servo servo; // Used for all servos
+static Hopper hopper;
+uint8_t hasIndicated = 0; // Will be 2 when it's finished
+
 void driveTest();
+void moveIndicator();
 
 void outputSensorVals() {
   Serial.print("Gyro angle: ");
   Serial.println(drivebase.getAngle());
 }
+
 
 void setup() {
   Serial.begin(9600);
@@ -67,9 +85,22 @@ void setup() {
   isDriving = false;
 
   Serial.println("Drivebase initialized");
+  // Indicate
+  if (!servo.attach(INDICATOR_SERVO)) {
+    Serial.println("Indicator unable to attach to its pin");
+  } // The port for the ball dropper
+  // 3 is the indicator servo
+  servo.write(SERVO_MAX_ANGLE);
+  ITimer2.init();
+  ITimer2.setInterval(MOVE_INDICATOR_TIME / INDICATOR_STEPS, moveIndicator, MOVE_INDICATOR_TIME);
 }
 
 void loop() {
+  // Re-attach the servo to the hopper
+  if (hasIndicated >= INDICATOR_STEPS && !hopper.isInitialized()) {
+    hopper = Hopper(servo, HOPPER_BOT_SERVO);
+  }
+
   // End to end drive test
   if (IS_TESTING_DRIVE && !isDriving) {
     isDriving = true;
@@ -106,8 +137,11 @@ void loop() {
         drivebase.setLeftPower(FULL_SPEED);
         drivebase.setRightPower(-FULL_SPEED);
         break;
-      case 103: // g
-        drivebase.setGyroOffset(drivebase.getAngle()); // Zero the gyro
+      case 103:                                         // g
+        drivebase.setGyroOffset(drivebase.getAngle());  // Zero the gyro
+        break;
+      case 100: // d for drop
+        hopper.dropOneBall();
         break;
     }
   }
@@ -115,6 +149,21 @@ void loop() {
   // Periodic print without using Timer2 (which messes with deploying the code)
   if (millis() % 1000L == 0) {
     outputSensorVals();
+  }
+}
+
+void moveIndicator() {
+  Serial.println("Indicating");
+  if (hasIndicated >= INDICATOR_STEPS) {
+    // Do nothing
+  } else {
+    Serial.println("Movings");
+    if (hasIndicated % 2 == 0) {
+      servo.write(SERVO_MAX_ANGLE);
+    } else {
+      servo.write(SERVO_MIN_ANGLE);
+    }
+    hasIndicated++;
   }
 }
 
@@ -138,7 +187,7 @@ void driveTest() {
   double error = 0.0;
   do {
     error = drivebase.calcTurnError(target);
-    if (count == 0) {                  // Print every 255 cycles
+    if (count == 0) {  // Print every 255 cycles
       Serial.println(drivebase.getAngle());
     }
     count++;
@@ -151,11 +200,11 @@ void driveTest() {
   target = 45;
   drivebase.setLeftPower(-HALF_SPEED);
   drivebase.setRightPower(HALF_SPEED);
-  
+
   // Keep turning until you got there
   do {
     error = drivebase.calcTurnError(target);
-    if (count == 0) {                  // Print every 255 cycles
+    if (count == 0) {  // Print every 255 cycles
       Serial.println(drivebase.getAngle());
     }
     count++;
