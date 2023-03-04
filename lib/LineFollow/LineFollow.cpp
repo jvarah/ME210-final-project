@@ -7,12 +7,10 @@
 
 #include <Arduino.h>
 
-LineFollow::LineFollow(uint8_t left_wing, uint8_t line_left,
-                       uint8_t line_center, uint8_t line_right,
+LineFollow::LineFollow(uint8_t left_wing, uint8_t line_left, uint8_t line_right,
                        uint8_t right_wing) {
   _left_wing = left_wing;
   _line_left = line_left;
-  _line_center = line_center;
   _line_right = line_right;
   _right_wing = right_wing;
 }
@@ -22,7 +20,7 @@ bool LineFollow::testForBlackTape(uint16_t min_black_threshold) {
   uint16_t max_wing_reading =
       max(analogRead(_left_wing), analogRead(_right_wing));
   uint16_t max_line_reading =
-      max(max(analogRead(_line_left), analogRead(_line_right)), _line_center);
+      max(analogRead(_line_left), analogRead(_line_right));
   return max(max_wing_reading, max_line_reading) > min_black_threshold;
 }
 
@@ -42,11 +40,9 @@ bool LineFollow::testForOnLine(uint16_t max_white_threshold,
                                uint16_t min_black_threshold) {
   bool is_left_red =
       isRed(analogRead(_line_left), max_white_threshold, min_black_threshold);
-  bool is_center_red =
-      isRed(analogRead(_line_center), max_white_threshold, min_black_threshold);
   bool is_right_red =
       isRed(analogRead(_line_right), max_white_threshold, min_black_threshold);
-  return is_left_red || is_center_red || is_right_red;
+  return is_left_red || is_right_red;
 }
 
 Motor_powers_t LineFollow::getLineFollowPowers(
@@ -54,11 +50,10 @@ Motor_powers_t LineFollow::getLineFollowPowers(
   // TODO: Add PID
   uint16_t left_value = analogRead(_line_left);
   uint16_t right_value = analogRead(_line_right);
-  uint16_t center_value = analogRead(_line_center);
-  if (left_value > center_value) {
+  if (left_value > right_value) {
     // Turn left
     return {INT8_MIN, INT8_MAX};
-  } else if (right_value > center_value) {
+  } else if (right_value > left_value) {
     // Turn right
     return {INT8_MAX, INT8_MIN};
   }
@@ -75,8 +70,6 @@ void LineFollow::printDebug() {
   Serial.println(analogRead(_line_left));
   Serial.print("LineR: ");
   Serial.println(analogRead(_line_right));
-  Serial.print("Center: ");
-  Serial.println(analogRead(_line_center));
   Serial.print("LW: ");
   Serial.println(analogRead(_left_wing));
   Serial.print("RW: ");

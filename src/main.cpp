@@ -34,9 +34,8 @@
 // full turn)
 
 // Tape sensing
-#define LEFT_WING_PORT A1
-#define LINE_LEFT_PORT A2
-#define LINE_CENTER_PORT A3  // Input for tape signal
+#define LEFT_WING_PORT A2
+#define LINE_LEFT_PORT A3
 #define LINE_RIGHT_PORT A4
 #define RIGHT_WING_PORT A5
 
@@ -95,7 +94,7 @@ static bool isDriving;
 static Drive drivebase;
 static double turnTarget = 0.0;
 static LineFollow lineFollow =
-    LineFollow(LEFT_WING_PORT, LINE_LEFT_PORT, LINE_CENTER_PORT,
+    LineFollow(LEFT_WING_PORT, LINE_LEFT_PORT,
                LINE_RIGHT_PORT, RIGHT_WING_PORT);
 
 // Tunable parameters

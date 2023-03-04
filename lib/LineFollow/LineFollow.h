@@ -16,7 +16,7 @@ class LineFollow {
     /**
      * Pass in the ports for the tape sensors on the robot
     */
-    LineFollow(uint8_t left_wing, uint8_t line_left, uint8_t line_center, uint8_t line_right, uint8_t right_wing);
+    LineFollow(uint8_t left_wing, uint8_t line_left, uint8_t line_right, uint8_t right_wing);
     bool testForBlackTape(uint16_t min_black_threshold);
     /**
      * Check if the left wing sees red tape (given max value for white, and min value for black tape)
@@ -39,7 +39,6 @@ class LineFollow {
   private:
     uint8_t _left_wing;
     uint8_t _line_left;
-    uint8_t _line_center;
     uint8_t _line_right;
     uint8_t _right_wing;
     bool isRed(uint16_t sensor_value, uint16_t max_white, uint16_t min_black);
