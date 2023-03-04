@@ -33,6 +33,17 @@ static Drive drivebase;
 #define MAX_TURN_ERROR 1.0 // Degrees
 // #define TURN_K_P 1/180.0 // Full motor output at the max error (need to do a full turn)
 
+#define START_BUTTON_PORT 0
+#define START_BUTTON_LED_PORT 12
+#define DEBOUNCE_DELAY 50
+int startButtonVal = 0;
+unsigned long lastStartButtonDBTime = 0;
+
+int startButtonLEDState = LOW;
+int startButtonState;
+int lastStartButtonState = HIGH;
+
+
 typedef enum {
   DRIVE_FORWARD,
   TURN_RIGHT,
@@ -67,9 +78,46 @@ void setup() {
   isDriving = false;
 
   Serial.println("Drivebase initialized");
+
+  pinMode(START_BUTTON_PORT, INPUT);
+  pinMode(START_BUTTON_LED_PORT, OUTPUT);
+  digitalWrite(START_BUTTON_LED_PORT, LOW);
+
+  Serial.println("Start button initialized");
+}
+
+void checkStartButton() {
+  // get current reading
+  startButtonVal = digitalRead(START_BUTTON_PORT);
+  // If the switch changed, due to noise or pressing:
+  if (startButtonVal != lastStartButtonState) {
+    // reset the debouncing timer
+    lastStartButtonDBTime = millis();
+  }
+  if ((millis() - lastStartButtonDBTime) > DEBOUNCE_DELAY) {
+  // whatever the reading is at, it's been there for longer than the debounce
+  // delay, so take it as the actual current state:
+
+    // if the button state has changed:
+    if (startButtonVal != startButtonState) {
+      startButtonState = startButtonVal;
+      Serial.println("Button pressed!");
+
+      // only toggle the LED if the new button state is HIGH
+      if (startButtonState == HIGH) startButtonLEDState = LOW;
+      else startButtonLEDState = HIGH;
+    }
+  }
+
+  // set the LED:
+  digitalWrite(START_BUTTON_LED_PORT, startButtonLEDState);
+
+  // save the reading. Next time through the loop, it'll be the lastButtonState:
+  lastStartButtonState = startButtonVal;
 }
 
 void loop() {
+  checkStartButton();
   // End to end drive test
   if (IS_TESTING_DRIVE && !isDriving) {
     isDriving = true;
