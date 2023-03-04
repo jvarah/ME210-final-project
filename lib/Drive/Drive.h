@@ -23,6 +23,8 @@ class Drive {
   double getAngle();
   void setGyroOffset(double offset);
   double calcTurnError(double target_angle);
+  void setTurnPIDPowers(double target_angle, double k_p); 
+  void printDebug();
 
  private:
   bool isLeftInverted();
