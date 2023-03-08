@@ -35,12 +35,12 @@ Drive::Drive(uint8_t left_dir_port, uint8_t left_en_port,
   gyro_offset = 0;
   gyro_port = gyro_prt;
 
-  // Init gyro to pass to drivebase
-  if (!gyro.begin()) {
-    Serial.println("No gyro detected");
-  }
-  gyro.setExtCrystalUse(true);
-  setGyroInit();
+  // // Init gyro to pass to drivebase
+  // if (!gyro.begin()) {
+  //   Serial.println("No gyro detected");
+  // }
+  // gyro.setExtCrystalUse(true);
+  // setGyroInit();
 
   // Motor initialization
   l_dir_port = left_dir_port;
@@ -192,12 +192,36 @@ void Drive::setGyroOffset(double offset) {
 
 /**
  * Get the turn error (to use for PID turning), limited from -180 to 180.
- * @param target_angle must be between 0 and 359 (absolute target)
+ * @param target_angle should be between 0 and 359 (absolute target), but can be between [-360.0, inf)
 */
 double Drive::calcTurnError(double target_angle) {
+  // Normalize the target angle
+  if (target_angle > GYRO_DEGREES) {
+    target_angle = fmod(target_angle, GYRO_DEGREES);
+  // fmod doesn't work the way I want it to with negatives (remainder still negative), so this is a way of fixing angles between -360.0 and 0
+  } else if (target_angle < 0) {
+    target_angle += GYRO_DEGREES;
+  }
+
   double error = target_angle - getAngle();
   if (error > GYRO_HALF_DEGREES) {
     error -= GYRO_DEGREES;
   }
   return error;
+}
+
+void Drive::setTurnPIDPowers(double target_angle, double k_p) {
+  double error = calcTurnError(target_angle);
+  double product = error * k_p;
+  // Cap powers to max inputs
+  if (abs(product) > INT8_MAX) {
+    product = copysign(INT8_MAX, product);
+  }
+  setLeftPower(product);
+  setRightPower(-product);
+}
+
+void Drive::printDebug() {
+  Serial.print("Gyro angle: ");
+  Serial.println(getAngle());
 }
