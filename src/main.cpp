@@ -64,7 +64,7 @@
 #define SERVO_MAX_ANGLE 180
 #define SERVO_MIN_ANGLE 0
 
-#define IR_BEACON_MIN 250 // TODO: Test, min value where you know you are facing close enough to the IR beacon
+#define IR_BEACON_MIN 350 // TODO: Test, min value where you know you are facing close enough to the IR beacon
 
 typedef enum {
   DRIVE_FORWARD,
@@ -345,9 +345,9 @@ void moveIndicator() {
 void outputSensorVals() {
   // drivebase.printDebug();
   lineFollow.printDebug();
-  Serial.println(lineFollow.testForBlackTape());
-  // Serial.print("IR sensor");
-  // Serial.println(analogRead(IR_SENSE_1));
+  // Serial.println(lineFollow.testForBlackTape());
+  Serial.print("IR sensor");
+  Serial.println(analogRead(IR_SENSE_1));
   // Serial.println(state);
   // Serial.println(line_follow_state);
 }
