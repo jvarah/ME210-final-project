@@ -64,6 +64,8 @@
 #define SERVO_MAX_ANGLE 180
 #define SERVO_MIN_ANGLE 0
 
+#define IR_BEACON_MIN 250 // TODO: Test, min value where you know you are facing close enough to the IR beacon
+
 typedef enum {
   DRIVE_FORWARD,
   TURN_RIGHT,
@@ -80,9 +82,8 @@ typedef enum {
 } States_t;
 
 typedef enum {
-  DRIVING_TO_BLACK_TAPE,
-  DRIVING_UNTIL_NO_BLACK_TAPE,
-  DRIVING_UNTIL_RED_TAPE,
+  TURNING_TO_IR_BEACON,
+  DRIVING_OUT_OF_STUDIO,
   LINE_FOLLOW_UNTIL_LEFT_WING,
   DRIVE_UNTIL_NO_LEFT_WING,
   LINE_FOLLOW_UNTIL_BLACK_TAPE,
@@ -143,6 +144,8 @@ static uint16_t center_to_side_diff = CENTER_TO_SIDE_DIFFERENCE;
 static Servo servo;  // Used for all servos
 static Hopper hopper;
 uint8_t hasIndicated = 0;  // Will be 2 when it's finished
+
+uint32_t last_time = 0;
 
 void driveTest();
 void handleExitStudio(Score_targets_t press_target);
@@ -277,9 +280,9 @@ void loop() {
       // Tests for line follow
       case 101:  // e
         state = EXITING_STUDIO;
-        line_follow_state = DRIVING_TO_BLACK_TAPE;
-        drivebase.setLeftPower(FULL_SPEED);
-        drivebase.setRightPower(FULL_SPEED);
+        line_follow_state = TURNING_TO_IR_BEACON;
+        drivebase.setLeftPower(-HALF_SPEED);
+        drivebase.setRightPower(HALF_SPEED);
         break;
       default:
       case 100:  // d for drop
@@ -373,45 +376,22 @@ void printUpdateAndChange(uint16_t &old, uint16_t new_val) {
  */
 void handleExitStudio(Score_targets_t press_target) {
   switch (line_follow_state) {
-    case DRIVING_TO_BLACK_TAPE:
-      // // Serial.println("Driving to black tape");
-      // // Once black tape detected, pass it
-      // if (lineFollow.testForBlackTape()) {
-      //   drivebase.setLeftPower(HALF_SPEED);
-      //   drivebase.setRightPower(HALF_SPEED);
-        line_follow_state = DRIVING_UNTIL_NO_BLACK_TAPE;
-      //   Serial.println("Driving to no black tape");
-      // }
-      // Serial.println("No black tape");
+    case TURNING_TO_IR_BEACON:
+      if (analogRead(IR_SENSE_1) > IR_BEACON_MIN) {
+        drivebase.setLeftPower(HALF_SPEED);
+        drivebase.setRightPower(HALF_SPEED);
+        line_follow_state = DRIVING_OUT_OF_STUDIO;
+        last_time = millis();
+      }
       break;
-    case DRIVING_UNTIL_NO_BLACK_TAPE:
-      // // Once no black tape detected, drive until on line
-      // if (!lineFollow.testForBlackTape()) {
-      //   drivebase.stopMotors();
-        line_follow_state = DRIVING_UNTIL_RED_TAPE;
-      //   drivebase.setLeftPower(HALF_SPEED);
-      //   drivebase.setRightPower(HALF_SPEED);
-      //   Serial.println("No black tape, driving to line");
-      // }
-      break;
-    case DRIVING_UNTIL_RED_TAPE:
-      // Serial.println("Driving until red tape");
-      // // Check if any of the line sensors are on red first
-      // if (lineFollow.testForOnLine()) {
+    case DRIVING_OUT_OF_STUDIO:
+      // TODO: if timer expired, stop
+      // Drive for one second
+      if (millis() - last_time > 1000) {
+        drivebase.stopMotors();
         line_follow_state = LINE_FOLLOW_UNTIL_LEFT_WING;
-      //   drivebase.stopMotors();
-      //   // Otherwise, if the wing is on the line, turn towards the line
-      // } else if (lineFollow.testForLeftWingRed()) {
-      //   line_follow_state = TURN_LEFT_UNTIL_ON_RED;
-      //   drivebase.setLeftPower(-FULL_SPEED);
-      //   drivebase.setRightPower(FULL_SPEED);
-      // } else if (lineFollow.testForRightWingRed()) {
-      //   line_follow_state = TURN_RIGHT_UNTIL_ON_RED;
-      //   drivebase.setLeftPower(FULL_SPEED);
-      //   drivebase.setRightPower(-FULL_SPEED);
-      // }
+      }
       break;
-
     case LINE_FOLLOW_UNTIL_LEFT_WING:
       // Serial.println("Driving until left wing");
       // TODO: Check if it's possible to start on the line but with the left
