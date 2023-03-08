@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <Drive.h>
+#include <Hopper.h>
 #include <LineFollow.h>
 #include <SPI.h>
 
@@ -51,6 +52,14 @@
   MIN_BLACK_VOLTAGE -             \
       MAX_WHITE_VOLTAGE  // Difference between center sensor and left/right tape
                          // sensors when fully centered
+// #define TURN_K_P 1/180.0 // Full motor output at the max error (need to do a
+// full turn)
+
+// Servo constants
+#define HOPPER_BOT_SERVO 11
+#define INDICATOR_SERVO 3
+#define SERVO_MAX_ANGLE 180
+#define SERVO_MIN_ANGLE 0
 
 typedef enum {
   DRIVE_FORWARD,
@@ -93,9 +102,8 @@ static Line_follow_states_t line_follow_state = WAIT_FOR_LINE_FOLLOW_INPUT;
 static bool isDriving;
 static Drive drivebase;
 static double turnTarget = 0.0;
-static LineFollow lineFollow =
-    LineFollow(LEFT_WING_PORT, LINE_LEFT_PORT,
-               LINE_RIGHT_PORT, RIGHT_WING_PORT);
+static LineFollow lineFollow = LineFollow(LEFT_WING_PORT, LINE_LEFT_PORT,
+                                          LINE_RIGHT_PORT, RIGHT_WING_PORT);
 
 // Tunable parameters
 static double k_p_turn = K_P_TURN;
@@ -105,6 +113,14 @@ static uint16_t min_black = MIN_BLACK_VOLTAGE;
 static uint16_t center_to_side_diff = CENTER_TO_SIDE_DIFFERENCE;
 
 #define IR_SENSE_1 A0
+
+#define NUM_SERVOS 2
+#define INDICATOR_STEPS 3
+#define MOVE_INDICATOR_TIME 5000  // 5 Seconds
+
+static Servo servo;  // Used for all servos
+static Hopper hopper;
+uint8_t hasIndicated = 0;  // Will be 2 when it's finished
 
 void driveTest();
 void handleExitStudio(Score_targets_t press_target);
@@ -116,6 +132,7 @@ void handleConstantChange();
 void handleExitStudio(Score_targets_t press_target);
 void handleStudioToGood();
 void handleStudioToBad();
+void moveIndicator();
 
 void setup() {
   Serial.begin(9600);
@@ -134,10 +151,24 @@ void setup() {
 
   pinMode(IR_SENSE_1, INPUT);
   Serial.println("Drivebase initialized");
+  // Indicate
+  if (!servo.attach(INDICATOR_SERVO)) {
+    Serial.println("Indicator unable to attach to its pin");
+  }  // The port for the ball dropper
+  // 3 is the indicator servo
+  servo.write(SERVO_MAX_ANGLE);
+  ITimer2.init();
+  ITimer2.setInterval(MOVE_INDICATOR_TIME / INDICATOR_STEPS, moveIndicator,
+                      MOVE_INDICATOR_TIME);
 }
 
 void loop() {
-  // // End to end drive test
+  // Re-attach the servo to the hopper
+  if (hasIndicated >= INDICATOR_STEPS && !hopper.isInitialized()) {
+    hopper = Hopper(servo, HOPPER_BOT_SERVO);
+  }
+
+  // End to end drive test
   // if (IS_TESTING_DRIVE && !isDriving) {
   //   isDriving = true;
   //   driveTest();
@@ -223,6 +254,8 @@ void loop() {
         drivebase.setRightPower(FULL_SPEED);
         break;
       default:
+      case 100:  // d for drop
+        hopper.dropOneBall();
         break;
     }
   }
@@ -234,9 +267,8 @@ void loop() {
   //   case DISPENSE_ONE_BALL:
   //     // TODO: Replace this with the servo code once ready
   //     delay(1000);
-  //     // TODO: Add going from good to bad or something, depending on the target
-  //     state = NOTHING;
-  //     break;
+  //     // TODO: Add going from good to bad or something, depending on the
+  //     target state = NOTHING; break;
   //   case DRIVING_STUDIO_TO_BAD:
   //     handleStudioToBad();
   //     break;
@@ -254,8 +286,23 @@ void loop() {
   }
 }
 
+void moveIndicator() {
+  Serial.println("Indicating");
+  if (hasIndicated >= INDICATOR_STEPS) {
+    // Do nothing
+  } else {
+    Serial.println("Movings");
+    if (hasIndicated % 2 == 0) {
+      servo.write(SERVO_MAX_ANGLE);
+    } else {
+      servo.write(SERVO_MIN_ANGLE);
+    }
+    hasIndicated++;
+  }
+}
+
 void outputSensorVals() {
-  //drivebase.printDebug();
+  drivebase.printDebug();
   lineFollow.printDebug();
   Serial.print("IR sensor");
   Serial.println(analogRead(IR_SENSE_1));
