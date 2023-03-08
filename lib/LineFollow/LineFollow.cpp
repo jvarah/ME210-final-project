@@ -46,16 +46,24 @@ bool LineFollow::testForOnLine(uint16_t max_white_threshold,
 }
 
 Motor_powers_t LineFollow::getLineFollowPowers(
-    uint16_t light_diff_when_centered) {
-  // TODO: Add PID
+  uint16_t diff_when_centered/*float k_p*/) {
+  
+  
   uint16_t left_value = analogRead(_line_left);
   uint16_t right_value = analogRead(_line_right);
+
+  // TODO: Add PID
+  // uint16_t error = left_value - right_value;
+  // double pid_output = error * k_p;
+  // return {uint8_t(-pid_output), uint8_t(pid_output)};
+
+  
   if (left_value > right_value) {
     // Turn left
-    return {INT8_MIN, INT8_MAX};
+    return {INT8_MAX >> 1, INT8_MAX};
   } else if (right_value > left_value) {
     // Turn right
-    return {INT8_MAX, INT8_MIN};
+    return {INT8_MAX, INT8_MAX >> 1};
   }
   return {INT8_MAX, INT8_MAX};
 }

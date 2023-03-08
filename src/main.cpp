@@ -15,7 +15,7 @@
 
 // Motor constants
 #define LEFT_MOTOR_DIR_PORT 7
-#define LEFT_MOTOR_EN_PORT 10
+#define LEFT_MOTOR_EN_PORT 6 // 10 stopped working
 #define RIGHT_MOTOR_EN_PORT 5
 #define RIGHT_MOTOR_DIR_PORT 4
 
@@ -249,9 +249,10 @@ void loop() {
       // Tests for line follow
       case 101:  // e
         state = EXITING_STUDIO;
-        line_follow_state = DRIVING_TO_BLACK_TAPE;
-        drivebase.setLeftPower(FULL_SPEED);
-        drivebase.setRightPower(FULL_SPEED);
+        // line_follow_state = DRIVING_TO_BLACK_TAPE;
+        line_follow_state = LINE_FOLLOW_UNTIL_BLACK_TAPE;
+        // drivebase.setLeftPower(FULL_SPEED);
+        // drivebase.setRightPower(FULL_SPEED);
         break;
       default:
       case 100:  // d for drop
@@ -260,15 +261,23 @@ void loop() {
     }
   }
 
+  if (state == EXITING_STUDIO) {
+    switch (line_follow_state) {
+      case LINE_FOLLOW_UNTIL_BLACK_TAPE:
+        followLine();
+        break;
+    }
+  }
+
   // switch (state) {
   //   case EXITING_STUDIO:
   //     handleExitStudio(GOOD_PRESS);  // TODO: Test bad presss
   //     break;
-  //   case DISPENSE_ONE_BALL:
-  //     // TODO: Replace this with the servo code once ready
-  //     delay(1000);
-  //     // TODO: Add going from good to bad or something, depending on the
-  //     target state = NOTHING; break;
+  //   // case DISPENSE_ONE_BALL:
+  //   //   // TODO: Replace this with the servo code once ready
+  //   //   delay(1000);
+  //   //   // TODO: Add going from good to bad or something, depending on the
+  //   //   target state = NOTHING; break;
   //   case DRIVING_STUDIO_TO_BAD:
   //     handleStudioToBad();
   //     break;
@@ -379,6 +388,7 @@ void handleExitStudio(Score_targets_t press_target) {
         } else if (press_target == BAD_PRESS) {
           state = DRIVING_STUDIO_TO_BAD;
           line_follow_state = TURNING_90_DEG_LEFT_TO_BAD;
+          Serial.println("Haha, no gyro");
           turnTarget = drivebase.getAngle() - 90;
         }
       } else {
