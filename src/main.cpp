@@ -23,7 +23,7 @@
 #define IS_LEFT_INVERTED 1   // was 0
 #define IS_RIGHT_INVERTED 0  // was 1
 
-#define FULL_SPEED 64
+#define FULL_SPEED 127
 #define HALF_SPEED 64  // 64 // Max forward is 127
 
 #define IS_TESTING_DRIVE 0  // Set to 1 to test the driving
@@ -103,19 +103,16 @@ typedef enum {
 
 typedef enum { GOOD_PRESS, BAD_PRESS } Score_targets_t;
 
-#define MIN_WHITE_GUESS 100
-#define MAX_RED_GUESS 270
-#define MAX_BLACK_GUESS 480
 
 static Line_thresholds_t thresholds = {
     // LW values
-    132, 238, 346, 
+    132, 423, 430, // 3-8-23
     // LL values
-    133, 233, 367, 
+    133, 398, 430, // 3-8-23 at 8pm
     // LR values
-    131, 238, 378, 
+    131, 400, 431, // 3-8-23 at 8pm
     // RW Values
-    128, 206, 340,
+    128, 350, 430, // Untested, just guess for competition
 };
 
 #define LEAVE_STUDIO_TIME 1000
@@ -123,9 +120,9 @@ static Line_thresholds_t thresholds = {
   125  // Keep the robot straight after aligning with IR beacon
 #define LINE_FOLLOW_WAIT \
   2000  // Follow line for 2 seconds before checking for wings
-#define TURN_TIME_90_DEG_HALF_SPD 1500 // TODO: Tune/measure
-#define K_P_LINE_FOLLOW 0.005 // Max diff ~100 units, base power is 0.5, make max error = full power
-#define LINE_FOLLOW_BASE_POWER HALF_SPEED
+#define TURN_TIME_90_DEG_HALF_SPD 563 // TODO: Tune/measure
+#define K_P_LINE_FOLLOW 0.0025 // Max diff ~100 units, base power is 0.5, make max error = full power
+#define LINE_FOLLOW_BASE_POWER HALF_SPEED * 1.2
 
 static States_t state = NOTHING;
 static Line_follow_states_t line_follow_state = WAIT_FOR_LINE_FOLLOW_INPUT;
@@ -292,6 +289,7 @@ void loop() {
       case 101:  // e
         state = EXITING_STUDIO;
         line_follow_state = TURNING_TO_IR_BEACON;
+        // line_follow_state = LINE_FOLLOW_UNTIL_BLACK_TAPE; // For line follow testing only
         drivebase.setLeftPower(-HALF_SPEED);
         drivebase.setRightPower(HALF_SPEED);
         break;
@@ -429,6 +427,7 @@ void handleBadToGood() {
       break;
     case LINE_FOLLOW_UNTIL_BLACK_TAPE:
       if (lineFollow.testForBlackTape()) {
+        Serial.println("Got black tape");
         drivebase.stopMotors();
         line_follow_state = WAIT_FOR_LINE_FOLLOW_INPUT;
         state = DISPENSE_TWO_BALLS;
@@ -488,6 +487,10 @@ void handleExitStudio(Score_targets_t press_target) {
         followLine();
       }
       break;
+
+    // case LINE_FOLLOW_UNTIL_BLACK_TAPE: // For testing line follow only, set state to LINE_FOLLOW_UNTIL_BLACK_TAPE in main
+    //   followLine();
+    //   break;
     default:
       Serial.println("Something is not good in exiting studio");
       break;
@@ -497,6 +500,7 @@ void handleExitStudio(Score_targets_t press_target) {
 void followLine() {
   // Make it simple, then implement PID
   Motor_powers_t powers = lineFollow.getLineFollowPowers(K_P_LINE_FOLLOW, LINE_FOLLOW_BASE_POWER);
+  // Serial.println(powers.left_power); // TODO: Remove
   drivebase.setLeftPower(powers.left_power);
   drivebase.setRightPower(powers.right_power);
 }

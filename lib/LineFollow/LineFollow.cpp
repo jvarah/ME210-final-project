@@ -8,6 +8,7 @@
 #include <Arduino.h>
 
 #define RED_BLACK_WIGGLE_ROOM 20
+#define SENSOR_NOISE 20
 
 LineFollow::LineFollow(uint8_t left_wing, uint8_t line_left, uint8_t line_right,
                        uint8_t right_wing, Line_thresholds_t thresholds) {
@@ -54,14 +55,23 @@ bool LineFollow::testForOnLine() {
   return is_left_red || is_right_red;
 }
 
-Motor_powers_t LineFollow::getLineFollowPowers(float k_p, int8_t base_power) {
+Motor_powers_t LineFollow::getLineFollowPowers(double k_p, int8_t base_power) {
   uint16_t left_value = analogRead(_line_left);
   uint16_t right_value = analogRead(_line_right);
 
-  uint16_t error = left_value - right_value;
-  double pid_output = error * k_p;
-  // If left value more than right value, it is more red, therefore, turn left
-  return {base_power + int8_t(-pid_output), base_power + int8_t(pid_output)};
+  int16_t error = left_value - right_value;
+  // double pid_output = error * k_p;
+  if (abs(error) < SENSOR_NOISE) {
+    return {base_power, base_power};
+  } else if (right_value > (left_value + SENSOR_NOISE)) {
+    // Turn right
+    return {base_power, 0};
+  } else {
+    // Turn left
+    // If left value more than right value, it is more red, therefore, turn left
+    return {0, base_power};
+  }
+  
 }
 
 bool LineFollow::isRed(uint16_t sensor_value, uint16_t min_white,
