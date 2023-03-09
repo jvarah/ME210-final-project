@@ -23,12 +23,8 @@ void LineFollow::setThresholds(Line_thresholds_t thresholds) {
 }
 
 Line_sensor_vals_t LineFollow::getSensorReadings() {
-  return {
-    analogRead(_left_wing), 
-    analogRead(_right_wing),
-    analogRead(_line_left), 
-    analogRead(_line_right)
-  };
+  return {analogRead(_left_wing), analogRead(_right_wing),
+          analogRead(_line_left), analogRead(_line_right)};
 }
 
 bool LineFollow::testForBlackTape() {
@@ -41,51 +37,36 @@ bool LineFollow::testForBlackTape() {
 }
 
 bool LineFollow::testForLeftWingRed() {
-  return isRed(analogRead(_left_wing), _thresholds.min_lw_white, _thresholds.max_lw_red, _thresholds.max_lw_black);
+  return isRed(analogRead(_left_wing), _thresholds.min_lw_white,
+               _thresholds.max_lw_red, _thresholds.max_lw_black);
 }
 
 bool LineFollow::testForRightWingRed() {
-  return isRed(analogRead(_right_wing), _thresholds.min_rw_white, _thresholds.max_rw_red, _thresholds.max_rw_black);
+  return isRed(analogRead(_right_wing), _thresholds.min_rw_white,
+               _thresholds.max_rw_red, _thresholds.max_rw_black);
 }
 
 bool LineFollow::testForOnLine() {
-  bool is_left_red =
-      isRed(analogRead(_line_left), _thresholds.min_ll_white, _thresholds.max_ll_red, _thresholds.max_ll_black);
-  bool is_right_red =
-      isRed(analogRead(_line_right), _thresholds.min_lr_white, _thresholds.max_lr_red, _thresholds.max_lr_black);
+  bool is_left_red = isRed(analogRead(_line_left), _thresholds.min_ll_white,
+                           _thresholds.max_ll_red, _thresholds.max_ll_black);
+  bool is_right_red = isRed(analogRead(_line_right), _thresholds.min_lr_white,
+                            _thresholds.max_lr_red, _thresholds.max_lr_black);
   return is_left_red || is_right_red;
 }
 
-Motor_powers_t LineFollow::getLineFollowPowers(
-  uint16_t diff_when_centered/*float k_p*/) {
-  
-  
+Motor_powers_t LineFollow::getLineFollowPowers(float k_p, int8_t base_power) {
   uint16_t left_value = analogRead(_line_left);
   uint16_t right_value = analogRead(_line_right);
 
-  // TODO: Add PID
-  // uint16_t error = left_value - right_value;
-  // double pid_output = error * k_p;
-  // return {uint8_t(-pid_output), uint8_t(pid_output)};
-
-  
-  if (left_value > right_value) {
-    // Turn left
-    return {32, 64};
-    // return {INT8_MAX >> 1, INT8_MAX};
-
-  } else if (right_value > left_value) {
-    // Turn right
-    // return {INT8_MAX, INT8_MAX >> 1};
-    return {64, 32};
-  }
-  // return {INT8_MAX, INT8_MAX};
-  return {64, 64};
+  uint16_t error = left_value - right_value;
+  double pid_output = error * k_p;
+  // If left value more than right value, it is more red, therefore, turn left
+  return {base_power + int8_t(-pid_output), base_power + int8_t(pid_output)};
 }
 
 bool LineFollow::isRed(uint16_t sensor_value, uint16_t min_white,
                        uint16_t max_red, uint16_t max_black) {
-  uint16_t max_white = (min_white + max_red) >> 1; // Divide by 2 for average
+  uint16_t max_white = (min_white + max_red) >> 1;  // Divide by 2 for average
   uint16_t min_black = (max_red + RED_BLACK_WIGGLE_ROOM);
   return (sensor_value > max_white) && (sensor_value < min_black);
 }

@@ -26,7 +26,7 @@ class LineFollow {
     /**
      * Get the error for PID line follow, given the difference between the center and right/left wings when the robot is centered over the line
     */
-    Motor_powers_t getLineFollowPowers(uint16_t light_diff_when_centered); // TODO: Add P for smoother line follow
+    Motor_powers_t getLineFollowPowers(float k_p, int8_t base_power); // TODO: Add P for smoother line follow
     /**
      * Check that any of the line sensors (middle 3) are on the line
     */

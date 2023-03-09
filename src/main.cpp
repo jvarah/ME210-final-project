@@ -108,7 +108,14 @@ typedef enum { GOOD_PRESS, BAD_PRESS } Score_targets_t;
 #define MAX_BLACK_GUESS 480
 
 static Line_thresholds_t thresholds = {
-    132, 238, 346, 133, 233, 367, 131, 238, 378, 128, 206, 340,
+    // LW values
+    132, 238, 346, 
+    // LL values
+    133, 233, 367, 
+    // LR values
+    131, 238, 378, 
+    // RW Values
+    128, 206, 340,
 };
 
 #define LEAVE_STUDIO_TIME 1000
@@ -117,6 +124,8 @@ static Line_thresholds_t thresholds = {
 #define LINE_FOLLOW_WAIT \
   2000  // Follow line for 2 seconds before checking for wings
 #define TURN_TIME_90_DEG_HALF_SPD 1500 // TODO: Tune/measure
+#define K_P_LINE_FOLLOW 0.005 // Max diff ~100 units, base power is 0.5, make max error = full power
+#define LINE_FOLLOW_BASE_POWER HALF_SPEED
 
 static States_t state = NOTHING;
 static Line_follow_states_t line_follow_state = WAIT_FOR_LINE_FOLLOW_INPUT;
@@ -487,7 +496,7 @@ void handleExitStudio(Score_targets_t press_target) {
 
 void followLine() {
   // Make it simple, then implement PID
-  Motor_powers_t powers = lineFollow.getLineFollowPowers(center_to_side_diff);
+  Motor_powers_t powers = lineFollow.getLineFollowPowers(K_P_LINE_FOLLOW, LINE_FOLLOW_BASE_POWER);
   drivebase.setLeftPower(powers.left_power);
   drivebase.setRightPower(powers.right_power);
 }
