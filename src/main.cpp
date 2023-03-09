@@ -99,23 +99,29 @@ typedef enum {
   WAIT_FOR_LINE_FOLLOW_INPUT,
   TURNING_90_DEG_LEFT_TO_GOOD,
   BACKUP,
+  DRIVING_PAST_LINE,
+  ENTER_STUDIO,
 
   // The following states are to get back onto the red line after leaving the
   // studio
 } Line_follow_states_t;
+
+#define ENTER_STUDIO_TIME 250
+#define BALL_LOAD_TIME 5000
+#define SKIP_RED_LINE_TIME 150
 
 typedef enum { GOOD_PRESS, BAD_PRESS } Score_targets_t;
 
 
 static Line_thresholds_t thresholds = {
     // LW values
-    132, 295, 280, // 3-8-23 at 12am
+    132, 350, 280, // 3-8-23 at 12am, then 295
     // LL values
-    133, 300, 285, // 3-8-23 at 9pm // Was 205, too low when untetheres, was 255, then 285, then 300
+    133, 350, 285, // 3-8-23 at 9pm // Was 205, too low when untetheres, was 255, then 285, then 300
     // LR values
-    131, 300, 290, // 3-8-23 at 8pm // Was 205, too low when unteth, was 245, then 275, then 300
+    131, 350, 290, // 3-8-23 at 8pm // Was 205, too low when unteth, was 245, then 275, then 300
     // RW Values
-    128, 295, 280, // Untested, just guess for competition Was 200, then 250
+    128, 325, 280, // Untested, just guess for competition Was 200, then 250, then 295
 };
 
 #define LEAVE_STUDIO_TIME 325
@@ -123,8 +129,10 @@ static Line_thresholds_t thresholds = {
   0  // Keep the robot straight after aligning with IR beacon
 #define LINE_FOLLOW_WAIT \
   1000  // Follow line for 2 seconds before checking for wings
-#define TURN_TIME_90_DEG_ONE_HALF_SPD 1650 // TODO: Tune/measure was 563
-#define TURN_TIME_180_BOTH_MOTORS 1000
+
+#define LINE_FOLLOW_BAD_GOOD_WAIT 2000
+#define TURN_TIME_90_DEG_ONE_HALF_SPD 1400 // TODO: Tune/measure was 563
+#define TURN_TIME_180_BOTH_MOTORS 900
 #define K_P_LINE_FOLLOW 0.0025 // Max diff ~100 units, base power is 0.5, make max error = full power
 #define LINE_FOLLOW_BASE_POWER HALF_SPEED * 1.1
 
@@ -445,23 +453,63 @@ void printUpdateAndChange(uint16_t &old, uint16_t new_val) {
 void handleGoodToStudio() {
   switch (line_follow_state) {
     case BACKUP:
-      if (millis() - last_time > BACKUP_TIME) {
+      if ((millis() - last_time) > BACKUP_TIME) {
         drivebase.setLeftPower(-HALF_SPEED);
         drivebase.setRightPower(HALF_SPEED);
         last_time = millis();
-        line_follow_state = TURNING_180_DEG;
+        line_follow_state = TURNING_90_DEG_LEFT_TO_GOOD;
       }
       break;
-    case TURNING_180_DEG:
+    case TURNING_90_DEG_LEFT_TO_GOOD:
       // Follow line after waiting for a ~180 deg turn
-      if (millis() - last_time > (TURN_TIME_180_BOTH_MOTORS) && lineFollow.testForOnLine()) {
+      if ((millis() - last_time > (TURN_TIME_180_BOTH_MOTORS * 0.5)) && lineFollow.testForOnLine()) {
         Serial.println("Line following until left wing hits");
         last_time = millis();
-        line_follow_state = LINE_FOLLOW_UNTIL_RIGHT_WING;
+        // line_follow_state = LINE_FOLLOW_UNTIL_RIGHT_WING;
+        line_follow_state = LINE_FOLLOW_UNTIL_BLACK_TAPE;
         followLine();
       }
       break;
     // TODO: Line follow past the right wing (drive for time)
+    // Not currentrly used
+    case LINE_FOLLOW_UNTIL_RIGHT_WING:
+      if (lineFollow.testForRightWingRed()) {
+        // Drive forward past the wing red
+        last_time = millis();
+        line_follow_state = DRIVING_PAST_LINE;
+      } else {
+        followLine();
+      }
+      break;
+    case DRIVING_PAST_LINE:
+      if ((millis() - last_time) > SKIP_RED_LINE_TIME) {
+        line_follow_state = LINE_FOLLOW_UNTIL_BLACK_TAPE;
+        followLine();
+      }
+      break;
+    case LINE_FOLLOW_UNTIL_BLACK_TAPE:
+      if (lineFollow.testForBlackTape()) {
+        last_time = millis();
+        line_follow_state = ENTER_STUDIO;
+        drivebase.setLeftPower(HALF_SPEED);
+        drivebase.setRightPower(HALF_SPEED);
+      }
+      break;
+    case ENTER_STUDIO:
+      if ((millis() - last_time) > ENTER_STUDIO_TIME) {
+        drivebase.stopMotors();
+        last_time = millis();
+        line_follow_state = WAIT_FOR_LINE_FOLLOW_INPUT;
+      }
+      break;
+    case WAIT_FOR_LINE_FOLLOW_INPUT:
+      if ((millis() - last_time) > BALL_LOAD_TIME) {
+        state = EXITING_STUDIO;
+        line_follow_state = TURNING_TO_IR_BEACON;
+        drivebase.setLeftPower(-QUARTER_SPEED);
+        drivebase.setRightPower(QUARTER_SPEED);
+      }
+      break;
   }
 }
 
@@ -485,7 +533,7 @@ void handleBadToGood() {
       }
       break;
     case LINE_FOLLOW_UNTIL_LEFT_WING:
-      if ((millis() - last_time > LINE_FOLLOW_WAIT) && lineFollow.testForLeftWingRed()) {
+      if ((millis() - last_time > LINE_FOLLOW_BAD_GOOD_WAIT) && lineFollow.testForLeftWingRed()) {
         Serial.println("Turning 90 deg left to good");
         last_time = millis();
         line_follow_state = TURNING_90_DEG_LEFT_TO_GOOD;
