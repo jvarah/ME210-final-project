@@ -7,7 +7,7 @@
 
 #include <Arduino.h>
 
-#define RED_BLACK_WIGGLE_ROOM 20
+#define RED_BLACK_WIGGLE_ROOM 125 // Was 150
 #define SENSOR_NOISE 20
 
 LineFollow::LineFollow(uint8_t left_wing, uint8_t line_left, uint8_t line_right,
@@ -31,10 +31,26 @@ Line_sensor_vals_t LineFollow::getSensorReadings() {
 bool LineFollow::testForBlackTape() {
   // Check if any of the sensors detect black tape
   bool lw_black = isBlack(analogRead(_left_wing), _thresholds.max_lw_red);
-  bool ll_black = isBlack(analogRead(_line_left), _thresholds.max_ll_red);
-  bool lr_black = isBlack(analogRead(_line_right), _thresholds.max_lr_red);
+  // bool ll_black = isBlack(analogRead(_line_left), _thresholds.max_ll_red);
+  // bool lr_black = isBlack(analogRead(_line_right), _thresholds.max_lr_red);
   bool rw_black = isBlack(analogRead(_right_wing), _thresholds.max_rw_red);
-  return lw_black || ll_black || lr_black || rw_black;
+
+  // TODO: Only for testing
+  // if (lw_black) {
+  //   Serial.println("Left wing black");
+  // }
+  // if (ll_black) {
+  //   Serial.println("Line left black");
+  // }
+  // if (lr_black) {
+  //   Serial.println("Line right black");
+  // }
+  // if (rw_black) {
+  //   Serial.println("Right wing black");
+  // }
+
+
+  return lw_black || rw_black;
 }
 
 bool LineFollow::testForLeftWingRed() {

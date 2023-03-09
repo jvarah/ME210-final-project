@@ -7,7 +7,7 @@
 
 #define DEFAULT_ANGLE 180
 #define DROP_ANGLE 135
-#define DROP_ONE_TIME 125
+#define DROP_ONE_TIME 175 // Was 125 before servo change
 #define DROP_ALL_TIME 500
 
 Hopper::Hopper() { _is_attached = false; }
@@ -19,7 +19,7 @@ Hopper::Hopper(Servo &servo, uint8_t servo_port) {
   _is_attached = true;
 }
 
-void Hopper::dropOneBall() {
+void Hopper::dropTwoBalls() {
   if (_is_attached) {
     _servo.write(DROP_ANGLE);
     delay(DROP_ONE_TIME);

@@ -13,7 +13,7 @@ class Hopper {
     /**
      * NOTE: These functions use delay to get the correct timing (not the best practice)
     */
-    void dropOneBall();
+    void dropTwoBalls();
     void dropAllBalls();
     bool isInitialized();
   private:
