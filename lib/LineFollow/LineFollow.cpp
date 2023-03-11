@@ -7,8 +7,8 @@
 
 #include <Arduino.h>
 
-#define RED_BLACK_WIGGLE_ROOM 125 // Was 150
-#define SENSOR_NOISE 20
+#define RED_BLACK_WIGGLE_ROOM 100 // Was 150, then 125 (now that red tape is 370)
+#define SENSOR_NOISE 20 // Was 20, then 10
 
 LineFollow::LineFollow(uint8_t left_wing, uint8_t line_left, uint8_t line_right,
                        uint8_t right_wing, Line_thresholds_t thresholds) {
@@ -50,7 +50,7 @@ bool LineFollow::testForBlackTape() {
   // }
 
 
-  return lw_black || rw_black;
+  return rw_black;
 }
 
 bool LineFollow::testForLeftWingRed() {
@@ -78,7 +78,7 @@ Motor_powers_t LineFollow::getLineFollowPowers(double k_p, int8_t base_power) {
   int16_t error = left_value - right_value;
   // double pid_output = error * k_p;
   if (abs(error) < SENSOR_NOISE) {
-    return {base_power, base_power};
+    return {(base_power >> 3) * 7, (base_power >> 3) * 7};
   } else if (right_value > (left_value + SENSOR_NOISE)) {
     // Turn right
     return {base_power, 0};
