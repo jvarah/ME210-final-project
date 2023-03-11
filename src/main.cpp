@@ -470,23 +470,6 @@ void handleGoodToStudio() {
         followLine();
       }
       break;
-    // TODO: Line follow past the right wing (drive for time)
-    // Not currentrly used
-    case LINE_FOLLOW_UNTIL_RIGHT_WING:
-      if (lineFollow.testForRightWingRed()) {
-        // Drive forward past the wing red
-        last_time = millis();
-        line_follow_state = DRIVING_PAST_LINE;
-      } else {
-        followLine();
-      }
-      break;
-    case DRIVING_PAST_LINE:
-      if ((millis() - last_time) > SKIP_RED_LINE_TIME) {
-        line_follow_state = LINE_FOLLOW_UNTIL_BLACK_TAPE;
-        followLine();
-      }
-      break;
     case LINE_FOLLOW_UNTIL_BLACK_TAPE:
       if (lineFollow.testForBlackTape()) {
         last_time = millis();
