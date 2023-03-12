@@ -108,7 +108,7 @@ typedef enum {
   // studio
 } Line_follow_states_t;
 
-#define ENTER_STUDIO_TIME 250
+#define ENTER_STUDIO_TIME 750
 #define BALL_LOAD_TIME 5000
 #define SKIP_RED_LINE_TIME 150
 
@@ -135,11 +135,13 @@ static Line_thresholds_t thresholds = {
 #define LINE_FOLLOW_BAD_GOOD_WAIT 2000
 #define TURN_TIME_90_DEG_ONE_HALF_SPD 1400 // TODO: Tune/measure was 563
 #define TURN_TIME_180_BOTH_MOTORS 900
-#define TURN_TIME_GOOD_PRESS 350
+#define TURN_TIME_GOOD_PRESS 600
 #define K_P_LINE_FOLLOW 0.5 // Max diff ~100 units, base power is 0.5, make max error = full power
-#define LINE_FOLLOW_BASE_POWER HALF_SPEED * 1.3 // 1.1 working, 1.3 too fast, so is 1.25 when at 20 (even 10) sensor slop, 1.15 ok
+#define LINE_FOLLOW_BASE_POWER HALF_SPEED * 1.0 // 1.1 working, 1.3 too fast, so is 1.25 when at 20 (even 10) sensor slop, 1.15 ok, 1.0 now with grippy
 
 #define BACKUP_TIME 200
+#define WAIT_TO_DETECT_BLACK 10000 // 5 too short, 15 seconds too long
+#define BACKUP_TIME_GOOD_TO_STUDIO 400
 
 static States_t state = NOTHING;
 static Line_follow_states_t line_follow_state = WAIT_FOR_LINE_FOLLOW_INPUT;
@@ -360,7 +362,7 @@ void loop() {
         state = DRIVING_GOOD_TO_STUDIO;
       }
       line_follow_state = BACKUP;
-      Serial.println("Backing up");
+      Serial.println("Bck up");
       last_time = millis();
       drivebase.setLeftPower(-HALF_SPEED);
       drivebase.setRightPower(-HALF_SPEED);
@@ -369,7 +371,7 @@ void loop() {
       hopper.dropAllBalls();
       state = DRIVING_GOOD_TO_STUDIO;
       line_follow_state = BACKUP;
-      Serial.println("Backing up");
+      Serial.println("Bck up");
       last_time = millis();
       drivebase.setLeftPower(-HALF_SPEED);
       drivebase.setRightPower(-HALF_SPEED);
@@ -397,17 +399,17 @@ void loop() {
   // Periodic print without using Timer2 (which messes with deploying the code)
   if (millis() % 1000L == 0) {
     // Serial.println("Outputting");
-    outputSensorVals();
+    // outputSensorVals();
   }
   // outputStateChanges();
 }
 
 void moveIndicator() {
-  Serial.println("Indicating");
+  // Serial.println("Indicating");
   if (hasIndicated >= INDICATOR_STEPS) {
     // Do nothing
   } else {
-    Serial.println("Movings");
+    // Serial.println("Movings");
     if (hasIndicated % 2 == 0) {
       servo.write(SERVO_MAX_ANGLE);
     } else {
@@ -456,9 +458,9 @@ void printUpdateAndChange(uint16_t &old, uint16_t new_val) {
 void handleGoodToStudio() {
   switch (line_follow_state) {
     case BACKUP:
-      if ((millis() - last_time) > (BACKUP_TIME * 6)) {
-        drivebase.setLeftPower(-HALF_SPEED);
-        drivebase.setRightPower(HALF_SPEED);
+      if ((millis() - last_time) > (BACKUP_TIME_GOOD_TO_STUDIO)) {
+        drivebase.setLeftPower(-QUARTER_SPEED * 0.75);
+        drivebase.setRightPower(QUARTER_SPEED * 0.75);
         last_time = millis();
         line_follow_state = TURNING_90_DEG_LEFT_TO_GOOD;
       }
@@ -466,7 +468,7 @@ void handleGoodToStudio() {
     case TURNING_90_DEG_LEFT_TO_GOOD:
       // Follow line after waiting for a ~180 deg turn
       if ((millis() - last_time > (TURN_TIME_GOOD_PRESS)) && lineFollow.testForOnLine()) {
-        Serial.println("Line following until left wing hits");
+        Serial.println("Fllw lw hit");
         last_time = millis();
         // line_follow_state = LINE_FOLLOW_UNTIL_RIGHT_WING;
         line_follow_state = LINE_FOLLOW_UNTIL_BLACK_TAPE;
@@ -474,7 +476,7 @@ void handleGoodToStudio() {
       }
       break;
     case LINE_FOLLOW_UNTIL_BLACK_TAPE:
-      if (lineFollow.testForBlackTape()) {
+      if (((millis() - last_time) > WAIT_TO_DETECT_BLACK) && lineFollow.testForBlackTape()) {
         last_time = millis();
         line_follow_state = ENTER_STUDIO;
         drivebase.setLeftPower(HALF_SPEED);
@@ -634,7 +636,8 @@ void handleStudioToGood() {
       if (lineFollow.testForBlackTape()) {
         drivebase.stopMotors();
         line_follow_state = WAIT_FOR_LINE_FOLLOW_INPUT;
-        state = DISPENSE_TWO_BALLS;
+        state = DISPENSE_ALL_BALLS;
+        last_time = millis();
       } else {
         followLine();
       }
@@ -652,7 +655,7 @@ void handleStudioToBad() {
       // Turned enough to start checking if on line
       if ((millis() - last_time > TURN_TIME_90_DEG_ONE_HALF_SPD) && lineFollow.testForOnLine()) {
         line_follow_state = LINE_FOLLOW_UNTIL_BLACK_TAPE;
-        Serial.println("Line follow until bad tape at bad press");
+        Serial.println("Folw til blk at bad");
         followLine();
       }
       break;
@@ -679,7 +682,7 @@ void handleStudioToBad() {
       // }
     case LINE_FOLLOW_UNTIL_BLACK_TAPE:
       if (lineFollow.testForBlackTape()) {
-        Serial.println("Dropping in bad press");
+        Serial.println("Drp bad");
         drivebase.stopMotors();
         state = DISPENSE_TWO_BALLS;
         line_follow_state = WAIT_FOR_LINE_FOLLOW_INPUT;

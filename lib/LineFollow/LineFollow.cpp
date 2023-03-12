@@ -78,7 +78,7 @@ Motor_powers_t LineFollow::getLineFollowPowers(double k_p, int8_t base_power) {
   int16_t error = left_value - right_value;
   // double pid_output = error * k_p;
   if (abs(error) < SENSOR_NOISE) {
-    return {(base_power >> 3) * 7, (base_power >> 3) * 7};
+    return {(base_power >> 2) * 3, (base_power >> 2) * 3}; // Fast 7/8 power for straight line (>> 3 for /8, * 7 for 7/8)
   } else if (right_value > (left_value + SENSOR_NOISE)) {
     // Turn right
     return {base_power, 0};
