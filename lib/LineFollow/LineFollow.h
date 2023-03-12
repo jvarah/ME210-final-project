@@ -15,6 +15,8 @@ class LineFollow {
     LineFollow(uint8_t left_wing, uint8_t line_left, uint8_t line_right,
                        uint8_t right_wing, Line_thresholds_t thresholds); 
     bool testForBlackTape();
+    bool testForLeftWingBlack(); // added ESL
+    bool testForRightWingBlack(); // added ESL
     /**
      * Check if the left wing sees red tape (given max value for white, and min value for black tape)
     */

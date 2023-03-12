@@ -8,7 +8,7 @@
 #include <Arduino.h>
 
 #define RED_BLACK_WIGGLE_ROOM 100 // Was 150, then 125 (now that red tape is 370)
-#define SENSOR_NOISE 20 // Was 20, then 10
+#define SENSOR_NOISE 10 // Was 20, then 10 
 
 LineFollow::LineFollow(uint8_t left_wing, uint8_t line_left, uint8_t line_right,
                        uint8_t right_wing, Line_thresholds_t thresholds) {
@@ -51,6 +51,14 @@ bool LineFollow::testForBlackTape() {
 
 
   return rw_black;
+}
+
+bool LineFollow::testForLeftWingBlack() { // ESL
+  return isBlack(analogRead(_left_wing), _thresholds.max_lw_red);
+}
+
+bool LineFollow::testForRightWingBlack() { // ESL
+  return isBlack(analogRead(_right_wing), _thresholds.max_rw_red);
 }
 
 bool LineFollow::testForLeftWingRed() {

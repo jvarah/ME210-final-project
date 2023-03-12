@@ -24,7 +24,7 @@
 #define IS_RIGHT_INVERTED 0  // was 1
 
 #define FULL_SPEED 127
-#define HALF_SPEED 64  // 64 // Max forward is 127
+#define HALF_SPEED 64  // 64 // Max forward is 127 // originalLy 64 changed by ESL
 #define QUARTER_SPEED 48
 
 #define IS_TESTING_DRIVE 0  // Set to 1 to test the driving
@@ -103,12 +103,13 @@ typedef enum {
   BACKUP,
   DRIVING_PAST_LINE,
   ENTER_STUDIO,
+  PERPENDICULAR_PARK,
 
   // The following states are to get back onto the red line after leaving the
   // studio
 } Line_follow_states_t;
 
-#define ENTER_STUDIO_TIME 750
+#define ENTER_STUDIO_TIME 1400 // was 750 ESL
 #define BALL_LOAD_TIME 5000
 #define SKIP_RED_LINE_TIME 150
 
@@ -126,7 +127,7 @@ static Line_thresholds_t thresholds = {
     128, 350, 280, // Untested, just guess for competition Was 200, then 250, then 295, then 325
 };
 
-#define LEAVE_STUDIO_TIME 325
+#define LEAVE_STUDIO_TIME 200 // it was 325 for checkoff
 #define EXIT_TURN_DELAY \
   0  // Keep the robot straight after aligning with IR beacon
 #define LINE_FOLLOW_WAIT \
@@ -137,7 +138,7 @@ static Line_thresholds_t thresholds = {
 #define TURN_TIME_180_BOTH_MOTORS 900
 #define TURN_TIME_GOOD_PRESS 600
 #define K_P_LINE_FOLLOW 0.5 // Max diff ~100 units, base power is 0.5, make max error = full power
-#define LINE_FOLLOW_BASE_POWER HALF_SPEED * 1.0 // 1.1 working, 1.3 too fast, so is 1.25 when at 20 (even 10) sensor slop, 1.15 ok, 1.0 now with grippy
+#define LINE_FOLLOW_BASE_POWER HALF_SPEED * 0.92 // 1.1 working, 1.3 too fast, so is 1.25 when at 20 (even 10) sensor slop, 1.15 ok, 1.0 now with grippy
 
 #define BACKUP_TIME 200
 #define WAIT_TO_DETECT_BLACK 10000 // 5 too short, 15 seconds too long
@@ -222,10 +223,13 @@ void setup() {
 
   lineFollow.setThresholds(thresholds);
   state = EXITING_STUDIO;
-  line_follow_state = TURNING_TO_IR_BEACON;
+  // state = DRIVING_GOOD_TO_STUDIO; // for testing return to studio ESL
+  line_follow_state = TURNING_TO_IR_BEACON; // for testing return to studio ESL
   // line_follow_state = LINE_FOLLOW_UNTIL_BLACK_TAPE; // For line follow testing only
-  drivebase.setLeftPower(-QUARTER_SPEED);
+  drivebase.setLeftPower(-QUARTER_SPEED); 
   drivebase.setRightPower(QUARTER_SPEED);
+  // drivebase.setLeftPower(QUARTER_SPEED); // for testing ESL
+  // drivebase.setRightPower(QUARTER_SPEED);
 }
 
 void loop() {
@@ -460,7 +464,7 @@ void handleGoodToStudio() {
     case BACKUP:
       if ((millis() - last_time) > (BACKUP_TIME_GOOD_TO_STUDIO)) {
         drivebase.setLeftPower(-QUARTER_SPEED * 0.75);
-        drivebase.setRightPower(QUARTER_SPEED * 0.75);
+        drivebase.setRightPower(QUARTER_SPEED * 0.75 * 1.03); // changed ESL BRIAN
         last_time = millis();
         line_follow_state = TURNING_90_DEG_LEFT_TO_GOOD;
       }
@@ -476,13 +480,32 @@ void handleGoodToStudio() {
       }
       break;
     case LINE_FOLLOW_UNTIL_BLACK_TAPE:
-      if (((millis() - last_time) > WAIT_TO_DETECT_BLACK) && lineFollow.testForBlackTape()) {
-        last_time = millis();
-        line_follow_state = ENTER_STUDIO;
-        drivebase.setLeftPower(HALF_SPEED);
-        drivebase.setRightPower(HALF_SPEED);
+      if (((millis() - last_time) > WAIT_TO_DETECT_BLACK) && (lineFollow.testForLeftWingBlack() || lineFollow.testForRightWingBlack())) {
+        line_follow_state = PERPENDICULAR_PARK; // ESL and below commented
+        drivebase.stopMotors();
+        // last_time = millis(); 
+        // line_follow_state = ENTER_STUDIO;
+        // drivebase.setLeftPower(QUARTER_SPEED*0.95);
+        // drivebase.setRightPower(QUARTER_SPEED);
       } else {
         followLine();
+      }
+      break;
+    case PERPENDICULAR_PARK: // ESL whole case
+      if (lineFollow.testForLeftWingBlack() && lineFollow.testForRightWingBlack()) {
+        last_time = millis();
+        line_follow_state = ENTER_STUDIO;
+        drivebase.setLeftPower(QUARTER_SPEED*0.97);
+        drivebase.setRightPower(QUARTER_SPEED);
+      } else if (lineFollow.testForLeftWingBlack()) {
+        drivebase.setLeftPower(0);
+        drivebase.setRightPower(QUARTER_SPEED);
+      } else if (lineFollow.testForRightWingBlack()) {
+        drivebase.setLeftPower(QUARTER_SPEED);
+        drivebase.setRightPower(0);
+      } else {
+        drivebase.setLeftPower(QUARTER_SPEED*0.97);
+        drivebase.setRightPower(QUARTER_SPEED);
       }
       break;
     case ENTER_STUDIO:
@@ -564,7 +587,7 @@ void handleExitStudio(Score_targets_t press_target) {
       if (analogRead(IR_SENSE_1) > IR_BEACON_MIN) {
         delay(EXIT_TURN_DELAY);
         drivebase.setLeftPower(HALF_SPEED);
-        drivebase.setRightPower(HALF_SPEED);
+        drivebase.setRightPower(HALF_SPEED); // CHANGED BY ESL *0.95
         line_follow_state = DRIVING_OUT_OF_STUDIO;
         last_time = millis();
         Serial.println("Exiting studio by driving forward");

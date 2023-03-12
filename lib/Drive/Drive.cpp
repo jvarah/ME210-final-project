@@ -18,8 +18,8 @@
 #define FORWARD (uint8_t)0
 #define BACKWARD (uint8_t)1
 
-#define LEFT_SCALAR 0.95
-#define RIGHT_SCALAR 1.0
+#define LEFT_SCALAR 1.0 // was 0.95 ESL
+#define RIGHT_SCALAR 0.97 // was 0.1 ESL
 
 #define GYRO_DEGREES 360.0  // Max value from gyro (0 - 359.9999)
 #define GYRO_HALF_DEGREES (GYRO_DEGREES / 2)
