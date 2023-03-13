@@ -104,12 +104,13 @@ typedef enum {
   DRIVING_PAST_LINE,
   ENTER_STUDIO,
   PERPENDICULAR_PARK,
+  PERPENDICULAR_EXIT
 
   // The following states are to get back onto the red line after leaving the
   // studio
 } Line_follow_states_t;
 
-#define ENTER_STUDIO_TIME 1400 // was 750 ESL
+#define ENTER_STUDIO_TIME 1100 // was 750 ESL
 #define BALL_LOAD_TIME 5000
 #define SKIP_RED_LINE_TIME 150
 
@@ -138,7 +139,7 @@ static Line_thresholds_t thresholds = {
 #define TURN_TIME_180_BOTH_MOTORS 900
 #define TURN_TIME_GOOD_PRESS 600
 #define K_P_LINE_FOLLOW 0.5 // Max diff ~100 units, base power is 0.5, make max error = full power
-#define LINE_FOLLOW_BASE_POWER HALF_SPEED * 0.92 // 1.1 working, 1.3 too fast, so is 1.25 when at 20 (even 10) sensor slop, 1.15 ok, 1.0 now with grippy
+#define LINE_FOLLOW_BASE_POWER HALF_SPEED * 0.97 // 1.1 working, 1.3 too fast, so is 1.25 when at 20 (even 10) sensor slop, 1.15 ok, 1.0 now with grippy
 
 #define BACKUP_TIME 200
 #define WAIT_TO_DETECT_BLACK 10000 // 5 too short, 15 seconds too long
@@ -403,7 +404,7 @@ void loop() {
   // Periodic print without using Timer2 (which messes with deploying the code)
   if (millis() % 1000L == 0) {
     // Serial.println("Outputting");
-    // outputSensorVals();
+    outputSensorVals();
   }
   // outputStateChanges();
 }
