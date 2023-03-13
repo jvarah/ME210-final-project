@@ -111,7 +111,7 @@ typedef enum {
 } Line_follow_states_t;
 
 #define ENTER_STUDIO_TIME 1100 // was 750 ESL
-#define BALL_LOAD_TIME 5000
+#define BALL_LOAD_TIME 3000
 #define SKIP_RED_LINE_TIME 150
 
 typedef enum { GOOD_PRESS, BAD_PRESS } Score_targets_t;
@@ -121,14 +121,14 @@ static Line_thresholds_t thresholds = {
     // LW values
     132, 370, 280, // 3-8-23 at 12am, then 295, then 350
     // LL values
-    133, 350, 285, // 3-8-23 at 9pm // Was 205, too low when untetheres, was 255, then 285, then 300
+    133, 350, 285, // 3-8-23 at 9pm // Was 205, too low when untetheres, was 255, then 285, then 300, was 350 JAV
     // LR values
-    131, 350, 290, // 3-8-23 at 8pm // Was 205, too low when unteth, was 245, then 275, then 300
+    131, 350, 290, // 3-8-23 at 8pm // Was 205, too low when unteth, was 245, then 275, then 300, was 350 JAV
     // RW Values
-    128, 350, 280, // Untested, just guess for competition Was 200, then 250, then 295, then 325
+    128, 360, 280, // Untested, just guess for competition Was 200, then 250, then 295, then 325
 };
 
-#define LEAVE_STUDIO_TIME 200 // it was 325 for checkoff
+#define LEAVE_STUDIO_TIME 100 // it was 325 for checkoff // was 200 ESL
 #define EXIT_TURN_DELAY \
   0  // Keep the robot straight after aligning with IR beacon
 #define LINE_FOLLOW_WAIT \
@@ -137,9 +137,9 @@ static Line_thresholds_t thresholds = {
 #define LINE_FOLLOW_BAD_GOOD_WAIT 2000
 #define TURN_TIME_90_DEG_ONE_HALF_SPD 1400 // TODO: Tune/measure was 563
 #define TURN_TIME_180_BOTH_MOTORS 900
-#define TURN_TIME_GOOD_PRESS 600
+#define TURN_TIME_GOOD_PRESS 1500 // Was 600 JAV, then 800 too low
 #define K_P_LINE_FOLLOW 0.5 // Max diff ~100 units, base power is 0.5, make max error = full power
-#define LINE_FOLLOW_BASE_POWER HALF_SPEED * 0.97 // 1.1 working, 1.3 too fast, so is 1.25 when at 20 (even 10) sensor slop, 1.15 ok, 1.0 now with grippy
+#define LINE_FOLLOW_BASE_POWER HALF_SPEED * 0.89 // 1.1 working, 1.3 too fast, so is 1.25 when at 20 (even 10) sensor slop, 1.15 ok, 1.0 now with grippy
 
 #define BACKUP_TIME 200
 #define WAIT_TO_DETECT_BLACK 10000 // 5 too short, 15 seconds too long
@@ -590,8 +590,23 @@ void handleExitStudio(Score_targets_t press_target) {
         drivebase.setLeftPower(HALF_SPEED);
         drivebase.setRightPower(HALF_SPEED); // CHANGED BY ESL *0.95
         line_follow_state = DRIVING_OUT_OF_STUDIO;
+        // line_follow_state = PERPENDICULAR_EXIT;
         last_time = millis();
         Serial.println("Exiting studio by driving forward");
+      }
+      break;
+    case PERPENDICULAR_EXIT:
+      if (lineFollow.testForLeftWingBlack() && lineFollow.testForRightWingBlack()) {
+        last_time = millis();
+        line_follow_state = DRIVING_OUT_OF_STUDIO;
+        drivebase.setLeftPower(QUARTER_SPEED*0.97);
+        drivebase.setRightPower(QUARTER_SPEED);
+      } else if (lineFollow.testForLeftWingBlack()) {
+        drivebase.setLeftPower(0);
+        drivebase.setRightPower(QUARTER_SPEED);
+      } else if (lineFollow.testForRightWingBlack()) {
+        drivebase.setLeftPower(QUARTER_SPEED);
+        drivebase.setRightPower(0);
       }
       break;
     case DRIVING_OUT_OF_STUDIO:

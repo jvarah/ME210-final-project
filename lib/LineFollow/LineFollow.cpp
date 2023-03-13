@@ -7,8 +7,8 @@
 
 #include <Arduino.h>
 
-#define RED_BLACK_WIGGLE_ROOM 100 // Was 150, then 125 (now that red tape is 370)
-#define SENSOR_NOISE 10 // Was 20, then 10 
+#define RED_BLACK_WIGGLE_ROOM 125 // Was 150, then 125 (now that red tape is 370) // was 100 before comp ESL
+#define SENSOR_NOISE 3 // Was 20, then 10 
 
 LineFollow::LineFollow(uint8_t left_wing, uint8_t line_left, uint8_t line_right,
                        uint8_t right_wing, Line_thresholds_t thresholds) {
@@ -81,7 +81,7 @@ bool LineFollow::testForOnLine() {
 
 Motor_powers_t LineFollow::getLineFollowPowers(double k_p, int8_t base_power) {
   uint16_t left_value = analogRead(_line_left);
-  uint16_t right_value = analogRead(_line_right);
+  uint16_t right_value = analogRead(_line_right) + 1;
 
   int16_t error = left_value - right_value;
   // double pid_output = error * k_p;
