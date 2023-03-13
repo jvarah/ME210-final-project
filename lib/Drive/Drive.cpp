@@ -18,7 +18,8 @@
 #define FORWARD (uint8_t)0
 #define BACKWARD (uint8_t)1
 
-#define LEFT_SCALAR 0.9
+#define LEFT_SCALAR 1.0 // was 0.95 ESL
+#define RIGHT_SCALAR 0.97 // was 0.1 ESL
 
 #define GYRO_DEGREES 360.0  // Max value from gyro (0 - 359.9999)
 #define GYRO_HALF_DEGREES (GYRO_DEGREES / 2)
@@ -163,7 +164,7 @@ void Drive::setRightPower(int8_t power) {
   // Set PWM power, converting the negative/positive range into a 0-255 output
   // Input is between -127 to 128, which shows direction and magnitude
   // Want the power to be between 0 to 255, so multiply abs(input) by 2
-  analogWrite(r_en_port, uint8_t(abs(power)) << 1);
+  analogWrite(r_en_port, uint8_t(((abs(power)) << 1) * RIGHT_SCALAR));
 }
 
 void Drive::stopMotors() {

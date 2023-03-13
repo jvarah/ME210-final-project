@@ -8,7 +8,7 @@
 #define DEFAULT_ANGLE 180
 #define DROP_ANGLE 135
 #define DROP_ONE_TIME 175 // Was 125 before servo change
-#define DROP_ALL_TIME 500
+#define DROP_ALL_TIME 700
 
 Hopper::Hopper() { _is_attached = false; }
 

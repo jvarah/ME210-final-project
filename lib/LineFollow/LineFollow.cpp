@@ -7,8 +7,8 @@
 
 #include <Arduino.h>
 
-#define RED_BLACK_WIGGLE_ROOM 125 // Was 150
-#define SENSOR_NOISE 20
+#define RED_BLACK_WIGGLE_ROOM 125 // Was 150, then 125 (now that red tape is 370) // was 100 before comp ESL
+#define SENSOR_NOISE 3 // Was 20, then 10 
 
 LineFollow::LineFollow(uint8_t left_wing, uint8_t line_left, uint8_t line_right,
                        uint8_t right_wing, Line_thresholds_t thresholds) {
@@ -50,7 +50,15 @@ bool LineFollow::testForBlackTape() {
   // }
 
 
-  return lw_black || rw_black;
+  return rw_black;
+}
+
+bool LineFollow::testForLeftWingBlack() { // ESL
+  return isBlack(analogRead(_left_wing), _thresholds.max_lw_red);
+}
+
+bool LineFollow::testForRightWingBlack() { // ESL
+  return isBlack(analogRead(_right_wing), _thresholds.max_rw_red);
 }
 
 bool LineFollow::testForLeftWingRed() {
@@ -73,12 +81,12 @@ bool LineFollow::testForOnLine() {
 
 Motor_powers_t LineFollow::getLineFollowPowers(double k_p, int8_t base_power) {
   uint16_t left_value = analogRead(_line_left);
-  uint16_t right_value = analogRead(_line_right);
+  uint16_t right_value = analogRead(_line_right) + 1;
 
   int16_t error = left_value - right_value;
   // double pid_output = error * k_p;
   if (abs(error) < SENSOR_NOISE) {
-    return {base_power, base_power};
+    return {(base_power >> 2) * 3, (base_power >> 2) * 3}; // Fast 7/8 power for straight line (>> 3 for /8, * 7 for 7/8)
   } else if (right_value > (left_value + SENSOR_NOISE)) {
     // Turn right
     return {base_power, 0};
