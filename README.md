@@ -8,3 +8,6 @@ Given more time, we would have tested and tuned PID line follow (rather than our
 
 # Setup
 Clone the [GitHub repo](https://github.com/jvarah/ME210-final-project.git) and then open the folder with the PlatformIO extension for VS Code. A build of main should have no errors.
+
+# Final report
+See `final-report/` for our images and html file to be published to the ME210 website
