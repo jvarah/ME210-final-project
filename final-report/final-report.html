@@ -73,6 +73,1387 @@
 <p>Again, this image is the FSM that references the above state machines, to ultimately complete the goal of dispensing two press in the good press, and then two in the bad press</p>
 <p>For our final code, we ended up traveling to the bad press first to throw off opponents who needed the press scales to be level for scoring. We also used timers to replace the gyro, and a simpler line follow method, as described in the line follow section.</p>
 <p><img src="file:///d:\ME210\ME210-final-project\final-report\checkoff-fsm.jpg" alt="Final FSM"></p>
+<h1 id="code">Code</h1>
+<p>Under lib/, we have libraries for each of the main subsystems on our robot. These are abstractions so the <code>main.cpp</code> file can easily call methods like <code>getLineFollowPowers()</code> and <code>setLeftPower()</code> rather than worrying about manual calls to <code>analogWrite()</code> or <code>analogRead()</code></p>
+<p>All of the FSM logic is in <code>main.cpp</code></p>
+<h2 id="file-structure">File Structure</h2>
+<pre><code>me210-final-project/
+├── lib/
+│   ├── Drive/
+│   │   ├── Drive.cpp
+│   │   └── Drive.h
+│   ├── Hopper/
+│   │   ├── Hopper.cpp
+│   │   └── Hopper.h
+│   └── LineFollow/
+│       ├── LineDataTypes.h
+│       ├── LineFollow.cpp
+│       └── LineFollow.h
+└── src/
+    └── main.cpp
+</code></pre>
+<h2 id="maincpp">Main.cpp</h2>
+<pre><code class="language-cpp"><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;Arduino.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;Drive.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;Hopper.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;LineDataTypes.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;LineFollow.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;SPI.h&gt;</span></span>
+
+<span class="hljs-comment">// Setup the hardware timer constants, needs to be before #include</span>
+<span class="hljs-comment">// TimerInterrupt</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> USE_TIMER_1 false</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> USE_TIMER_2 true</span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> PRINT_FREQ 1.0  <span class="hljs-comment">// Hz</span></span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;TimerInterrupt.h&quot;</span></span>
+
+<span class="hljs-comment">// Motor constants</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> LEFT_MOTOR_DIR_PORT 7</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> LEFT_MOTOR_EN_PORT 6  <span class="hljs-comment">// 10 stopped working</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> RIGHT_MOTOR_EN_PORT 5</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> RIGHT_MOTOR_DIR_PORT 4</span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> IS_LEFT_INVERTED 1   <span class="hljs-comment">// was 0</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> IS_RIGHT_INVERTED 0  <span class="hljs-comment">// was 1</span></span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> FULL_SPEED 127</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> HALF_SPEED 64  <span class="hljs-comment">// 64 // Max forward is 127 // originalLy 64 changed by ESL</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> QUARTER_SPEED 48</span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> IS_TESTING_DRIVE 0  <span class="hljs-comment">// Set to 1 to test the driving</span></span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> GYRO_PORT 0x28</span>
+
+<span class="hljs-comment">// PID Constants</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> MAX_TURN_ERROR 1.0  <span class="hljs-comment">// Degrees</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> K_P_TURN 1 / 180.0  <span class="hljs-comment">// Full motor output at the max error (need to do a</span></span>
+<span class="hljs-comment">// full turn)</span>
+
+<span class="hljs-comment">// Tape sensing</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> LEFT_WING_PORT A2</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> LINE_LEFT_PORT A3</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> LINE_RIGHT_PORT A4</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> RIGHT_WING_PORT A5</span>
+
+<span class="hljs-comment">// Measured 3/2/23 at 11:18pm</span>
+<span class="hljs-comment">// ~4-5 mm between the bottom of the shielding and the bottom of the tape</span>
+<span class="hljs-comment">// sensor, ~3/4 in from bottom of shielding to the floor Using a Vce of 2.5V</span>
+<span class="hljs-comment">// with transresistive amplifier, 10k gain resistor, 5V input to LED</span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> MAX_WHITE_VOLTAGE \
+  190  <span class="hljs-comment">// This and below, white surface 3-7-23 after some tape mounting</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> MIN_BLACK_VOLTAGE \
+  300  <span class="hljs-comment">// This and above, black surface 3-7-23 after some tape mounting</span></span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> CENTER_TO_SIDE_DIFFERENCE \
+  MIN_BLACK_VOLTAGE -             \
+      MAX_WHITE_VOLTAGE  <span class="hljs-comment">// Difference between center sensor and left/right tape</span></span>
+                         <span class="hljs-comment">// sensors when fully centered</span>
+<span class="hljs-comment">// #define TURN_K_P 1/180.0 // Full motor output at the max error (need to do a</span>
+<span class="hljs-comment">// full turn)</span>
+
+<span class="hljs-comment">// Servo constants</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> HOPPER_BOT_SERVO 11</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> INDICATOR_SERVO 3</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> SERVO_MAX_ANGLE 180</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> SERVO_MIN_ANGLE 0</span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> IR_BEACON_MIN \
+  350  <span class="hljs-comment">// <span class="hljs-doctag">TODO:</span> Test, min value where you know you are facing close enough to</span></span>
+       <span class="hljs-comment">// the IR beacon wasa 250, then 300 for checkoff</span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> LINE_FOLLOW_UPDATE_FREQ 50 <span class="hljs-comment">// ms</span></span>
+
+<span class="hljs-keyword">typedef</span> <span class="hljs-keyword">enum</span> {
+  DRIVE_FORWARD,
+  TURN_RIGHT,
+  TURN_LEFT,
+  STOP,
+  DRIVE_BACKWARD,
+  NOTHING,
+  EXITING_STUDIO,
+  DRIVING_STUDIO_TO_GOOD,
+  DRIVING_STUDIO_TO_BAD,
+  DRIVING_FROM_GOOD_TO_BAD,
+  DRIVING_FROM_BAD_TO_GOOD,
+  DRIVING_GOOD_TO_STUDIO,
+  DISPENSE_TWO_BALLS,
+  DISPENSE_ALL_BALLS,
+} States_t;
+
+<span class="hljs-keyword">typedef</span> <span class="hljs-keyword">enum</span> {
+  TURNING_TO_IR_BEACON,
+  DRIVING_OUT_OF_STUDIO,
+  LINE_FOLLOW_UNTIL_LEFT_WING,
+  DRIVE_UNTIL_NO_LEFT_WING,
+  LINE_FOLLOW_UNTIL_BLACK_TAPE,
+  TURNING_180_DEG,
+  LINE_FOLLOW_UNTIL_RIGHT_WING,
+  TURNING_90_DEG_RIGHT,
+  TURNING_90_DEG_LEFT_TO_BAD,
+  WAIT_FOR_LINE_FOLLOW_INPUT,
+  TURNING_90_DEG_LEFT_TO_GOOD,
+  BACKUP,
+  DRIVING_PAST_LINE,
+  ENTER_STUDIO,
+  PERPENDICULAR_PARK,
+  PERPENDICULAR_EXIT
+
+  <span class="hljs-comment">// The following states are to get back onto the red line after leaving the</span>
+  <span class="hljs-comment">// studio</span>
+} Line_follow_states_t;
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> ENTER_STUDIO_TIME 1100 <span class="hljs-comment">// was 750 ESL</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> BALL_LOAD_TIME 3000</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> SKIP_RED_LINE_TIME 150</span>
+
+<span class="hljs-keyword">typedef</span> <span class="hljs-keyword">enum</span> { GOOD_PRESS, BAD_PRESS } Score_targets_t;
+
+
+<span class="hljs-type">static</span> Line_thresholds_t thresholds = {
+    <span class="hljs-comment">// LW values</span>
+    <span class="hljs-number">132</span>, <span class="hljs-number">370</span>, <span class="hljs-number">280</span>, <span class="hljs-comment">// 3-8-23 at 12am, then 295, then 350</span>
+    <span class="hljs-comment">// LL values</span>
+    <span class="hljs-number">133</span>, <span class="hljs-number">350</span>, <span class="hljs-number">285</span>, <span class="hljs-comment">// 3-8-23 at 9pm // Was 205, too low when untetheres, was 255, then 285, then 300, was 350 JAV</span>
+    <span class="hljs-comment">// LR values</span>
+    <span class="hljs-number">131</span>, <span class="hljs-number">350</span>, <span class="hljs-number">290</span>, <span class="hljs-comment">// 3-8-23 at 8pm // Was 205, too low when unteth, was 245, then 275, then 300, was 350 JAV</span>
+    <span class="hljs-comment">// RW Values</span>
+    <span class="hljs-number">128</span>, <span class="hljs-number">360</span>, <span class="hljs-number">280</span>, <span class="hljs-comment">// Untested, just guess for competition Was 200, then 250, then 295, then 325</span>
+};
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> LEAVE_STUDIO_TIME 100 <span class="hljs-comment">// it was 325 for checkoff // was 200 ESL</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> EXIT_TURN_DELAY \
+  0  <span class="hljs-comment">// Keep the robot straight after aligning with IR beacon</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> LINE_FOLLOW_WAIT \
+  1000  <span class="hljs-comment">// Follow line for 2 seconds before checking for wings</span></span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> LINE_FOLLOW_BAD_GOOD_WAIT 2000</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> TURN_TIME_90_DEG_ONE_HALF_SPD 1400 <span class="hljs-comment">// <span class="hljs-doctag">TODO:</span> Tune/measure was 563</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> TURN_TIME_180_BOTH_MOTORS 900</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> TURN_TIME_GOOD_PRESS 1500 <span class="hljs-comment">// Was 600 JAV, then 800 too low</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> K_P_LINE_FOLLOW 0.5 <span class="hljs-comment">// Max diff ~100 units, base power is 0.5, make max error = full power</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> LINE_FOLLOW_BASE_POWER HALF_SPEED * 0.89 <span class="hljs-comment">// 1.1 working, 1.3 too fast, so is 1.25 when at 20 (even 10) sensor slop, 1.15 ok, 1.0 now with grippy</span></span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> BACKUP_TIME 200</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> WAIT_TO_DETECT_BLACK 10000 <span class="hljs-comment">// 5 too short, 15 seconds too long</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> BACKUP_TIME_GOOD_TO_STUDIO 400</span>
+
+<span class="hljs-type">static</span> States_t state = NOTHING;
+<span class="hljs-type">static</span> Line_follow_states_t line_follow_state = WAIT_FOR_LINE_FOLLOW_INPUT;
+<span class="hljs-type">static</span> <span class="hljs-type">bool</span> isDriving;
+<span class="hljs-type">static</span> Drive drivebase;
+<span class="hljs-type">static</span> <span class="hljs-type">double</span> turnTarget = <span class="hljs-number">0.0</span>;
+<span class="hljs-type">static</span> LineFollow lineFollow =
+    <span class="hljs-built_in">LineFollow</span>(LEFT_WING_PORT, LINE_LEFT_PORT, LINE_RIGHT_PORT, RIGHT_WING_PORT,
+               thresholds);
+
+<span class="hljs-comment">// Tunable parameters</span>
+<span class="hljs-type">static</span> <span class="hljs-type">double</span> k_p_turn = K_P_TURN;
+<span class="hljs-type">static</span> <span class="hljs-type">double</span> turn_max_error = MAX_TURN_ERROR;
+<span class="hljs-type">static</span> <span class="hljs-type">uint16_t</span> max_white = MAX_WHITE_VOLTAGE;
+<span class="hljs-type">static</span> <span class="hljs-type">uint16_t</span> min_black = MIN_BLACK_VOLTAGE;
+<span class="hljs-type">static</span> <span class="hljs-type">uint16_t</span> center_to_side_diff = CENTER_TO_SIDE_DIFFERENCE;
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> IR_SENSE_1 A0</span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> NUM_SERVOS 2</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> INDICATOR_STEPS 3</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> MOVE_INDICATOR_TIME 1000  <span class="hljs-comment">// 5 Seconds</span></span>
+
+<span class="hljs-type">static</span> Servo servo;  <span class="hljs-comment">// Used for all servos</span>
+<span class="hljs-type">static</span> Hopper hopper;
+<span class="hljs-type">uint8_t</span> hasIndicated = <span class="hljs-number">0</span>;  <span class="hljs-comment">// Will be 2 when it&#x27;s finished</span>
+
+<span class="hljs-type">uint32_t</span> last_time = <span class="hljs-number">0</span>;
+
+Score_targets_t scoring_target;
+
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">driveTest</span><span class="hljs-params">()</span></span>;
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">handleExitStudio</span><span class="hljs-params">(Score_targets_t press_target)</span></span>;
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">followLine</span><span class="hljs-params">()</span></span>;
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">outputSensorVals</span><span class="hljs-params">()</span></span>;
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">outputStateChanges</span><span class="hljs-params">()</span></span>;
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">printUpdateAndChange</span><span class="hljs-params">(<span class="hljs-type">uint16_t</span> &amp;old, <span class="hljs-type">uint16_t</span> new_val)</span></span>;
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">printUpdateAndChange</span><span class="hljs-params">(<span class="hljs-type">double</span> &amp;old, <span class="hljs-type">double</span> new_val)</span></span>;
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">handleConstantChange</span><span class="hljs-params">()</span></span>;
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">handleStudioToGood</span><span class="hljs-params">()</span></span>;
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">handleStudioToBad</span><span class="hljs-params">()</span></span>;
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">moveIndicator</span><span class="hljs-params">()</span></span>;
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">handleBadToGood</span><span class="hljs-params">()</span></span>;
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">handleGoodToStudio</span><span class="hljs-params">()</span></span>; <span class="hljs-comment">// <span class="hljs-doctag">TODO:</span> Finish getting back to studio</span>
+
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">setup</span><span class="hljs-params">()</span> </span>{
+  Serial.<span class="hljs-built_in">begin</span>(<span class="hljs-number">9600</span>);
+  <span class="hljs-keyword">while</span> (!Serial)
+    ;
+
+  Serial.<span class="hljs-built_in">println</span>(<span class="hljs-string">&quot;Code started&quot;</span>);
+
+  <span class="hljs-comment">// // Init drivebase</span>
+  drivebase = <span class="hljs-built_in">Drive</span>(LEFT_MOTOR_DIR_PORT, LEFT_MOTOR_EN_PORT,
+                    RIGHT_MOTOR_DIR_PORT, RIGHT_MOTOR_EN_PORT, GYRO_PORT);
+
+  drivebase.<span class="hljs-built_in">setLeftInverted</span>(IS_LEFT_INVERTED);
+  drivebase.<span class="hljs-built_in">setRightInverted</span>(IS_RIGHT_INVERTED);
+  isDriving = <span class="hljs-literal">false</span>;
+
+  <span class="hljs-built_in">pinMode</span>(IR_SENSE_1, INPUT);
+  Serial.<span class="hljs-built_in">println</span>(<span class="hljs-string">&quot;Drivebase initialized&quot;</span>);
+
+  <span class="hljs-comment">// Init more values</span>
+  hasIndicated = <span class="hljs-number">0</span>;  <span class="hljs-comment">// Will be 2 when it&#x27;s finished</span>
+  last_time = <span class="hljs-number">0</span>;
+  scoring_target = GOOD_PRESS;
+
+  <span class="hljs-comment">// Indicate</span>
+  <span class="hljs-keyword">if</span> (!servo.<span class="hljs-built_in">attach</span>(INDICATOR_SERVO)) {
+    Serial.<span class="hljs-built_in">println</span>(<span class="hljs-string">&quot;Indicator unable to attach to its pin&quot;</span>);
+  }  <span class="hljs-comment">// The port for the ball dropper</span>
+  <span class="hljs-comment">// 3 is the indicator servo</span>
+  servo.<span class="hljs-built_in">write</span>(SERVO_MAX_ANGLE);
+  ITimer2.<span class="hljs-built_in">init</span>();
+  ITimer2.<span class="hljs-built_in">setInterval</span>(MOVE_INDICATOR_TIME / INDICATOR_STEPS, moveIndicator,
+                      MOVE_INDICATOR_TIME);
+
+  lineFollow.<span class="hljs-built_in">setThresholds</span>(thresholds);
+  state = EXITING_STUDIO;
+  <span class="hljs-comment">// state = DRIVING_GOOD_TO_STUDIO; // for testing return to studio ESL</span>
+  line_follow_state = TURNING_TO_IR_BEACON; <span class="hljs-comment">// for testing return to studio ESL</span>
+  <span class="hljs-comment">// line_follow_state = LINE_FOLLOW_UNTIL_BLACK_TAPE; // For line follow testing only</span>
+  drivebase.<span class="hljs-built_in">setLeftPower</span>(-QUARTER_SPEED); 
+  drivebase.<span class="hljs-built_in">setRightPower</span>(QUARTER_SPEED);
+  <span class="hljs-comment">// drivebase.setLeftPower(QUARTER_SPEED); // for testing ESL</span>
+  <span class="hljs-comment">// drivebase.setRightPower(QUARTER_SPEED);</span>
+}
+
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">loop</span><span class="hljs-params">()</span> </span>{
+  <span class="hljs-comment">// Re-attach the servo to the hopper</span>
+  <span class="hljs-keyword">if</span> (hasIndicated &gt;= INDICATOR_STEPS &amp;&amp; !hopper.<span class="hljs-built_in">isInitialized</span>()) {
+    hopper = <span class="hljs-built_in">Hopper</span>(servo, HOPPER_BOT_SERVO);
+  }
+
+  <span class="hljs-comment">// End to end drive test</span>
+  <span class="hljs-comment">// if (IS_TESTING_DRIVE &amp;&amp; !isDriving) {</span>
+  <span class="hljs-comment">//   isDriving = true;</span>
+  <span class="hljs-comment">//   driveTest();</span>
+  <span class="hljs-comment">// }</span>
+
+  <span class="hljs-comment">// Test forwards, backwards, left right</span>
+  <span class="hljs-comment">// For drive testing (no gyro)</span>
+  
+  <span class="hljs-keyword">if</span> (Serial.<span class="hljs-built_in">available</span>()) {
+    <span class="hljs-type">uint8_t</span> aKey = Serial.<span class="hljs-built_in">read</span>();
+    <span class="hljs-keyword">while</span> (Serial.<span class="hljs-built_in">available</span>()) {
+      Serial.<span class="hljs-built_in">read</span>();
+    }
+    Serial.<span class="hljs-built_in">println</span>(aKey);
+    <span class="hljs-keyword">switch</span> (aKey) {
+      <span class="hljs-comment">// Update values on the fly, only works with the first one</span>
+      <span class="hljs-comment">// case 116:  // t for turn error</span>
+      <span class="hljs-comment">//   Serial.println(&quot;Input a new value for turn error&quot;);</span>
+      <span class="hljs-comment">//   while (!Serial.available())</span>
+      <span class="hljs-comment">//     ;</span>
+      <span class="hljs-comment">//   double new_error = Serial.parseFloat();</span>
+      <span class="hljs-comment">//   printUpdateAndChange(turn_max_error, new_error);</span>
+      <span class="hljs-comment">//   break;</span>
+      <span class="hljs-comment">// case 112:  // p for turn p</span>
+      <span class="hljs-comment">//   Serial.println(&quot;Input a new value for turn p: &quot;);</span>
+      <span class="hljs-comment">//   while (!Serial.available())</span>
+      <span class="hljs-comment">//     ;</span>
+      <span class="hljs-comment">//   double new_p = Serial.parseFloat();</span>
+      <span class="hljs-comment">//   printUpdateAndChange(k_p_turn, new_p);</span>
+      <span class="hljs-comment">//   break;</span>
+      <span class="hljs-comment">// case 119:  // w for white tape thresh</span>
+      <span class="hljs-comment">//   Serial.println(&quot;Input a new value for max white: &quot;);</span>
+      <span class="hljs-comment">//   while (!Serial.available())</span>
+      <span class="hljs-comment">//     ;</span>
+      <span class="hljs-comment">//   uint16_t new_white_thresh = Serial.parseInt();</span>
+      <span class="hljs-comment">//   printUpdateAndChange(max_white, new_white_thresh);</span>
+      <span class="hljs-comment">//   break;</span>
+      <span class="hljs-keyword">case</span> <span class="hljs-number">98</span>:  <span class="hljs-comment">// b for backwards</span>
+        state = DRIVE_BACKWARD;
+        drivebase.<span class="hljs-built_in">setLeftPower</span>(-FULL_SPEED);
+        drivebase.<span class="hljs-built_in">setRightPower</span>(-FULL_SPEED);
+        <span class="hljs-comment">// Serial.println(&quot;Input a new value for min black: &quot;);</span>
+        <span class="hljs-comment">// while (!Serial.available())</span>
+        <span class="hljs-comment">//   ;</span>
+        <span class="hljs-comment">// uint16_t new_black_thresh = Serial.parseInt();</span>
+        <span class="hljs-comment">// printUpdateAndChange(min_black, new_black_thresh);</span>
+        <span class="hljs-keyword">break</span>;
+      <span class="hljs-keyword">case</span> <span class="hljs-number">99</span>:  <span class="hljs-comment">// c for calibrate</span>
+        state = NOTHING;
+        drivebase.<span class="hljs-built_in">setLeftPower</span>(HALF_SPEED);
+        drivebase.<span class="hljs-built_in">setRightPower</span>(HALF_SPEED);
+
+      <span class="hljs-comment">// case 100:  // d for diff</span>
+      <span class="hljs-comment">//   Serial.println(&quot;Input a new value for center to side difference: &quot;);</span>
+      <span class="hljs-comment">//   while (!Serial.available())</span>
+      <span class="hljs-comment">//     ;</span>
+      <span class="hljs-comment">//   uint16_t new_center_side_diff = Serial.parseInt();</span>
+      <span class="hljs-comment">//   printUpdateAndChange(center_to_side_diff, new_center_side_diff);</span>
+      <span class="hljs-comment">//   break;</span>
+      <span class="hljs-comment">// Tests for drivebase</span>
+      <span class="hljs-keyword">case</span> <span class="hljs-number">108</span>:  <span class="hljs-comment">// l</span>
+        state = TURN_LEFT;
+        drivebase.<span class="hljs-built_in">setLeftPower</span>(-FULL_SPEED);
+        drivebase.<span class="hljs-built_in">setRightPower</span>(FULL_SPEED);
+        <span class="hljs-keyword">break</span>;
+      <span class="hljs-keyword">case</span> <span class="hljs-number">102</span>:  <span class="hljs-comment">// f</span>
+        state = DRIVE_FORWARD;
+        Serial.<span class="hljs-built_in">println</span>(<span class="hljs-string">&quot;forward plz?&quot;</span>);
+        drivebase.<span class="hljs-built_in">setLeftPower</span>(FULL_SPEED);
+        drivebase.<span class="hljs-built_in">setRightPower</span>(FULL_SPEED);
+        <span class="hljs-keyword">break</span>;
+      <span class="hljs-keyword">case</span> <span class="hljs-number">115</span>:  <span class="hljs-comment">// s</span>
+        state = STOP;
+        drivebase.<span class="hljs-built_in">stopMotors</span>();
+        <span class="hljs-keyword">break</span>;
+      <span class="hljs-keyword">case</span> <span class="hljs-number">114</span>:  <span class="hljs-comment">// r</span>
+        state = TURN_RIGHT;
+        drivebase.<span class="hljs-built_in">setLeftPower</span>(FULL_SPEED);
+        drivebase.<span class="hljs-built_in">setRightPower</span>(-FULL_SPEED);
+        <span class="hljs-keyword">break</span>;
+      <span class="hljs-keyword">case</span> <span class="hljs-number">103</span>:                                         <span class="hljs-comment">// g</span>
+        drivebase.<span class="hljs-built_in">setGyroOffset</span>(drivebase.<span class="hljs-built_in">getAngle</span>());  <span class="hljs-comment">// Zero the gyro</span>
+        <span class="hljs-keyword">break</span>;
+      <span class="hljs-comment">// Tests for line follow</span>
+      <span class="hljs-keyword">case</span> <span class="hljs-number">101</span>:  <span class="hljs-comment">// e</span>
+        state = EXITING_STUDIO;
+        line_follow_state = TURNING_TO_IR_BEACON;
+        <span class="hljs-comment">// line_follow_state = LINE_FOLLOW_UNTIL_BLACK_TAPE; // For line follow testing only</span>
+        drivebase.<span class="hljs-built_in">setLeftPower</span>(-QUARTER_SPEED);
+        drivebase.<span class="hljs-built_in">setRightPower</span>(QUARTER_SPEED);
+
+
+        <span class="hljs-comment">// // Testing only 180</span>
+        <span class="hljs-comment">// state = DRIVING_FROM_BAD_TO_GOOD;</span>
+        <span class="hljs-comment">// line_follow_state = TURNING_180_DEG;</span>
+        <span class="hljs-comment">// drivebase.setLeftPower(-HALF_SPEED);</span>
+        <span class="hljs-comment">// drivebase.setRightPower(HALF_SPEED);</span>
+        <span class="hljs-comment">// last_time = millis();</span>
+        <span class="hljs-keyword">break</span>;
+      <span class="hljs-keyword">case</span> <span class="hljs-number">100</span>:  <span class="hljs-comment">// d for drop</span>
+        hopper.<span class="hljs-built_in">dropTwoBalls</span>();
+        <span class="hljs-keyword">break</span>;
+      <span class="hljs-keyword">default</span>:
+        <span class="hljs-keyword">break</span>;
+    }
+  }
+
+  <span class="hljs-comment">// if (state == EXITING_STUDIO) {</span>
+  <span class="hljs-comment">//   switch (line_follow_state) {</span>
+  <span class="hljs-comment">//     case LINE_FOLLOW_UNTIL_BLACK_TAPE:</span>
+  <span class="hljs-comment">//       followLine();</span>
+  <span class="hljs-comment">//       break;</span>
+  <span class="hljs-comment">//   }</span>
+  <span class="hljs-comment">// }</span>
+
+  <span class="hljs-keyword">switch</span> (state) {
+    <span class="hljs-keyword">case</span> EXITING_STUDIO:
+      <span class="hljs-built_in">handleExitStudio</span>(scoring_target);  <span class="hljs-comment">// <span class="hljs-doctag">TODO:</span> Test Good presss</span>
+      <span class="hljs-keyword">break</span>;
+    <span class="hljs-keyword">case</span> DISPENSE_TWO_BALLS:
+      hopper.<span class="hljs-built_in">dropTwoBalls</span>();
+      <span class="hljs-keyword">if</span> (scoring_target == BAD_PRESS) {
+        state = DRIVING_FROM_BAD_TO_GOOD;
+      } <span class="hljs-keyword">else</span> {
+        state = DRIVING_GOOD_TO_STUDIO;
+      }
+      line_follow_state = BACKUP;
+      Serial.<span class="hljs-built_in">println</span>(<span class="hljs-string">&quot;Bck up&quot;</span>);
+      last_time = <span class="hljs-built_in">millis</span>();
+      drivebase.<span class="hljs-built_in">setLeftPower</span>(-HALF_SPEED);
+      drivebase.<span class="hljs-built_in">setRightPower</span>(-HALF_SPEED);
+      <span class="hljs-keyword">break</span>;
+    <span class="hljs-keyword">case</span> DISPENSE_ALL_BALLS:
+      hopper.<span class="hljs-built_in">dropAllBalls</span>();
+      state = DRIVING_GOOD_TO_STUDIO;
+      line_follow_state = BACKUP;
+      Serial.<span class="hljs-built_in">println</span>(<span class="hljs-string">&quot;Bck up&quot;</span>);
+      last_time = <span class="hljs-built_in">millis</span>();
+      drivebase.<span class="hljs-built_in">setLeftPower</span>(-HALF_SPEED);
+      drivebase.<span class="hljs-built_in">setRightPower</span>(-HALF_SPEED);
+    <span class="hljs-keyword">case</span> DRIVING_STUDIO_TO_BAD:
+      <span class="hljs-built_in">handleStudioToBad</span>();
+      <span class="hljs-keyword">break</span>;
+    <span class="hljs-keyword">case</span> DRIVING_STUDIO_TO_GOOD:
+      <span class="hljs-built_in">handleStudioToGood</span>();
+      <span class="hljs-keyword">break</span>;
+    <span class="hljs-keyword">case</span> DRIVING_FROM_BAD_TO_GOOD:
+      <span class="hljs-built_in">handleBadToGood</span>();
+      <span class="hljs-keyword">break</span>;
+
+    <span class="hljs-comment">// <span class="hljs-doctag">TODO:</span> Below states for competition</span>
+    <span class="hljs-keyword">case</span> DRIVING_GOOD_TO_STUDIO: <span class="hljs-comment">// Not needed for checkoff</span>
+      <span class="hljs-built_in">handleGoodToStudio</span>();
+      <span class="hljs-keyword">break</span>;
+    <span class="hljs-comment">// case WAITING_FOR_GO:</span>
+    <span class="hljs-comment">//   // <span class="hljs-doctag">TODO:</span> Something</span>
+    <span class="hljs-comment">//   break;</span>
+    <span class="hljs-keyword">default</span>:
+      <span class="hljs-keyword">break</span>;  <span class="hljs-comment">// Don&#x27;t really care about the other states here</span>
+  }
+
+  <span class="hljs-comment">// Periodic print without using Timer2 (which messes with deploying the code)</span>
+  <span class="hljs-keyword">if</span> (<span class="hljs-built_in">millis</span>() % <span class="hljs-number">1000L</span> == <span class="hljs-number">0</span>) {
+    <span class="hljs-comment">// Serial.println(&quot;Outputting&quot;);</span>
+    <span class="hljs-built_in">outputSensorVals</span>();
+  }
+  <span class="hljs-comment">// outputStateChanges();</span>
+}
+
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">moveIndicator</span><span class="hljs-params">()</span> </span>{
+  <span class="hljs-comment">// Serial.println(&quot;Indicating&quot;);</span>
+  <span class="hljs-keyword">if</span> (hasIndicated &gt;= INDICATOR_STEPS) {
+    <span class="hljs-comment">// Do nothing</span>
+  } <span class="hljs-keyword">else</span> {
+    <span class="hljs-comment">// Serial.println(&quot;Movings&quot;);</span>
+    <span class="hljs-keyword">if</span> (hasIndicated % <span class="hljs-number">2</span> == <span class="hljs-number">0</span>) {
+      servo.<span class="hljs-built_in">write</span>(SERVO_MAX_ANGLE);
+    } <span class="hljs-keyword">else</span> {
+      servo.<span class="hljs-built_in">write</span>(SERVO_MIN_ANGLE);
+    }
+    hasIndicated++;
+  }
+}
+
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">outputStateChanges</span><span class="hljs-params">()</span> </span>{
+  <span class="hljs-keyword">if</span> (lineFollow.<span class="hljs-built_in">testForBlackTape</span>()) {
+    Serial.<span class="hljs-built_in">println</span>(<span class="hljs-string">&quot;Found black tape!&quot;</span>);
+  }
+  <span class="hljs-keyword">if</span> (lineFollow.<span class="hljs-built_in">testForLeftWingRed</span>()) {
+    Serial.<span class="hljs-built_in">println</span>(<span class="hljs-string">&quot;Left wing sensing red&quot;</span>);
+  }
+}
+
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">outputSensorVals</span><span class="hljs-params">()</span> </span>{
+  <span class="hljs-comment">// drivebase.printDebug();</span>
+  lineFollow.<span class="hljs-built_in">printDebug</span>();
+  Serial.<span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;IR sensor &quot;</span>);
+  Serial.<span class="hljs-built_in">println</span>(<span class="hljs-built_in">analogRead</span>(IR_SENSE_1));
+  <span class="hljs-comment">// Serial.println(state);</span>
+  <span class="hljs-comment">// Serial.println(line_follow_state);</span>
+}
+
+<span class="hljs-comment">// Output the change between and old and new value, and overwrite the old value</span>
+<span class="hljs-comment">// to be the new one</span>
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">printUpdateAndChange</span><span class="hljs-params">(<span class="hljs-type">double</span> &amp;old, <span class="hljs-type">double</span> new_val)</span> </span>{
+  Serial.<span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;Old value: &quot;</span>);
+  Serial.<span class="hljs-built_in">print</span>(old);
+  Serial.<span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;New value: &quot;</span>);
+  Serial.<span class="hljs-built_in">println</span>(new_val);
+  old = new_val;
+}
+
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">printUpdateAndChange</span><span class="hljs-params">(<span class="hljs-type">uint16_t</span> &amp;old, <span class="hljs-type">uint16_t</span> new_val)</span> </span>{
+  Serial.<span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;Old value: &quot;</span>);
+  Serial.<span class="hljs-built_in">print</span>(old);
+  Serial.<span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;New value: &quot;</span>);
+  Serial.<span class="hljs-built_in">println</span>(new_val);
+  old = new_val;
+}
+
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">handleGoodToStudio</span><span class="hljs-params">()</span> </span>{
+  <span class="hljs-keyword">switch</span> (line_follow_state) {
+    <span class="hljs-keyword">case</span> BACKUP:
+      <span class="hljs-keyword">if</span> ((<span class="hljs-built_in">millis</span>() - last_time) &gt; (BACKUP_TIME_GOOD_TO_STUDIO)) {
+        drivebase.<span class="hljs-built_in">setLeftPower</span>(-QUARTER_SPEED * <span class="hljs-number">0.75</span>);
+        drivebase.<span class="hljs-built_in">setRightPower</span>(QUARTER_SPEED * <span class="hljs-number">0.75</span> * <span class="hljs-number">1.03</span>); <span class="hljs-comment">// changed ESL BRIAN</span>
+        last_time = <span class="hljs-built_in">millis</span>();
+        line_follow_state = TURNING_90_DEG_LEFT_TO_GOOD;
+      }
+      <span class="hljs-keyword">break</span>;
+    <span class="hljs-keyword">case</span> TURNING_90_DEG_LEFT_TO_GOOD:
+      <span class="hljs-comment">// Follow line after waiting for a ~180 deg turn</span>
+      <span class="hljs-keyword">if</span> ((<span class="hljs-built_in">millis</span>() - last_time &gt; (TURN_TIME_GOOD_PRESS)) &amp;&amp; lineFollow.<span class="hljs-built_in">testForOnLine</span>()) {
+        Serial.<span class="hljs-built_in">println</span>(<span class="hljs-string">&quot;Fllw lw hit&quot;</span>);
+        last_time = <span class="hljs-built_in">millis</span>();
+        <span class="hljs-comment">// line_follow_state = LINE_FOLLOW_UNTIL_RIGHT_WING;</span>
+        line_follow_state = LINE_FOLLOW_UNTIL_BLACK_TAPE;
+        <span class="hljs-built_in">followLine</span>();
+      }
+      <span class="hljs-keyword">break</span>;
+    <span class="hljs-keyword">case</span> LINE_FOLLOW_UNTIL_BLACK_TAPE:
+      <span class="hljs-keyword">if</span> (((<span class="hljs-built_in">millis</span>() - last_time) &gt; WAIT_TO_DETECT_BLACK) &amp;&amp; (lineFollow.<span class="hljs-built_in">testForLeftWingBlack</span>() || lineFollow.<span class="hljs-built_in">testForRightWingBlack</span>())) {
+        line_follow_state = PERPENDICULAR_PARK; <span class="hljs-comment">// ESL and below commented</span>
+        drivebase.<span class="hljs-built_in">stopMotors</span>();
+        <span class="hljs-comment">// last_time = millis(); </span>
+        <span class="hljs-comment">// line_follow_state = ENTER_STUDIO;</span>
+        <span class="hljs-comment">// drivebase.setLeftPower(QUARTER_SPEED*0.95);</span>
+        <span class="hljs-comment">// drivebase.setRightPower(QUARTER_SPEED);</span>
+      } <span class="hljs-keyword">else</span> {
+        <span class="hljs-built_in">followLine</span>();
+      }
+      <span class="hljs-keyword">break</span>;
+    <span class="hljs-keyword">case</span> PERPENDICULAR_PARK: <span class="hljs-comment">// ESL whole case</span>
+      <span class="hljs-keyword">if</span> (lineFollow.<span class="hljs-built_in">testForLeftWingBlack</span>() &amp;&amp; lineFollow.<span class="hljs-built_in">testForRightWingBlack</span>()) {
+        last_time = <span class="hljs-built_in">millis</span>();
+        line_follow_state = ENTER_STUDIO;
+        drivebase.<span class="hljs-built_in">setLeftPower</span>(QUARTER_SPEED*<span class="hljs-number">0.97</span>);
+        drivebase.<span class="hljs-built_in">setRightPower</span>(QUARTER_SPEED);
+      } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (lineFollow.<span class="hljs-built_in">testForLeftWingBlack</span>()) {
+        drivebase.<span class="hljs-built_in">setLeftPower</span>(<span class="hljs-number">0</span>);
+        drivebase.<span class="hljs-built_in">setRightPower</span>(QUARTER_SPEED);
+      } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (lineFollow.<span class="hljs-built_in">testForRightWingBlack</span>()) {
+        drivebase.<span class="hljs-built_in">setLeftPower</span>(QUARTER_SPEED);
+        drivebase.<span class="hljs-built_in">setRightPower</span>(<span class="hljs-number">0</span>);
+      } <span class="hljs-keyword">else</span> {
+        drivebase.<span class="hljs-built_in">setLeftPower</span>(QUARTER_SPEED*<span class="hljs-number">0.97</span>);
+        drivebase.<span class="hljs-built_in">setRightPower</span>(QUARTER_SPEED);
+      }
+      <span class="hljs-keyword">break</span>;
+    <span class="hljs-keyword">case</span> ENTER_STUDIO:
+      <span class="hljs-keyword">if</span> ((<span class="hljs-built_in">millis</span>() - last_time) &gt; ENTER_STUDIO_TIME) {
+        drivebase.<span class="hljs-built_in">stopMotors</span>();
+        last_time = <span class="hljs-built_in">millis</span>();
+        line_follow_state = WAIT_FOR_LINE_FOLLOW_INPUT;
+      }
+      <span class="hljs-keyword">break</span>;
+    <span class="hljs-keyword">case</span> WAIT_FOR_LINE_FOLLOW_INPUT:
+      <span class="hljs-keyword">if</span> ((<span class="hljs-built_in">millis</span>() - last_time) &gt; BALL_LOAD_TIME) {
+        state = EXITING_STUDIO;
+        line_follow_state = TURNING_TO_IR_BEACON;
+        drivebase.<span class="hljs-built_in">setLeftPower</span>(-QUARTER_SPEED);
+        drivebase.<span class="hljs-built_in">setRightPower</span>(QUARTER_SPEED);
+      }
+      <span class="hljs-keyword">break</span>;
+  }
+}
+
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">handleBadToGood</span><span class="hljs-params">()</span> </span>{
+  <span class="hljs-keyword">switch</span> (line_follow_state) {
+    <span class="hljs-keyword">case</span> BACKUP:
+      <span class="hljs-keyword">if</span> (<span class="hljs-built_in">millis</span>() - last_time &gt; BACKUP_TIME) {
+        drivebase.<span class="hljs-built_in">setLeftPower</span>(-HALF_SPEED);
+        drivebase.<span class="hljs-built_in">setRightPower</span>(HALF_SPEED);
+        last_time = <span class="hljs-built_in">millis</span>();
+        line_follow_state = TURNING_180_DEG;
+      }
+      <span class="hljs-keyword">break</span>;
+    <span class="hljs-keyword">case</span> TURNING_180_DEG:
+      <span class="hljs-comment">// Follow line after waiting for a ~180 deg turn</span>
+      <span class="hljs-keyword">if</span> ((<span class="hljs-built_in">millis</span>() - last_time &gt; (TURN_TIME_180_BOTH_MOTORS)) &amp;&amp; lineFollow.<span class="hljs-built_in">testForOnLine</span>()) {
+        Serial.<span class="hljs-built_in">println</span>(<span class="hljs-string">&quot;Line following until left wing hits&quot;</span>);
+        last_time = <span class="hljs-built_in">millis</span>();
+        line_follow_state = LINE_FOLLOW_UNTIL_LEFT_WING;
+        <span class="hljs-built_in">followLine</span>();
+      }
+      <span class="hljs-keyword">break</span>;
+    <span class="hljs-keyword">case</span> LINE_FOLLOW_UNTIL_LEFT_WING:
+      <span class="hljs-keyword">if</span> ((<span class="hljs-built_in">millis</span>() - last_time &gt; LINE_FOLLOW_BAD_GOOD_WAIT) &amp;&amp; lineFollow.<span class="hljs-built_in">testForLeftWingRed</span>()) {
+        Serial.<span class="hljs-built_in">println</span>(<span class="hljs-string">&quot;Turning 90 deg left to good&quot;</span>);
+        last_time = <span class="hljs-built_in">millis</span>();
+        line_follow_state = TURNING_90_DEG_LEFT_TO_GOOD;
+        drivebase.<span class="hljs-built_in">setLeftPower</span>(<span class="hljs-number">0</span>);
+        drivebase.<span class="hljs-built_in">setRightPower</span>(HALF_SPEED);
+      } <span class="hljs-keyword">else</span> {
+        <span class="hljs-built_in">followLine</span>();
+      }
+      <span class="hljs-keyword">break</span>;
+    <span class="hljs-keyword">case</span> TURNING_90_DEG_LEFT_TO_GOOD:
+      <span class="hljs-keyword">if</span> ((<span class="hljs-built_in">millis</span>() - last_time &gt; TURN_TIME_90_DEG_ONE_HALF_SPD) &amp;&amp; lineFollow.<span class="hljs-built_in">testForOnLine</span>()) {
+        line_follow_state = LINE_FOLLOW_UNTIL_BLACK_TAPE;
+        Serial.<span class="hljs-built_in">println</span>(<span class="hljs-string">&quot;Line follow until bad tape at good press&quot;</span>);
+        <span class="hljs-built_in">followLine</span>();
+      } 
+      <span class="hljs-keyword">break</span>;
+    <span class="hljs-keyword">case</span> LINE_FOLLOW_UNTIL_BLACK_TAPE:
+      <span class="hljs-keyword">if</span> (lineFollow.<span class="hljs-built_in">testForBlackTape</span>()) {
+        Serial.<span class="hljs-built_in">println</span>(<span class="hljs-string">&quot;Got black tape&quot;</span>);
+        drivebase.<span class="hljs-built_in">stopMotors</span>();
+        line_follow_state = WAIT_FOR_LINE_FOLLOW_INPUT;
+        state = DISPENSE_ALL_BALLS;
+        scoring_target = GOOD_PRESS; <span class="hljs-comment">// Only score on good press after first attempt</span>
+      } <span class="hljs-keyword">else</span> {
+        <span class="hljs-built_in">followLine</span>();
+      }
+      <span class="hljs-keyword">break</span>;
+  }
+}
+
+<span class="hljs-comment">/**
+ * Exit studio procedure (separate FSM)
+ * Will get to the first intersection from starting aligned in the studio
+ */</span>
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">handleExitStudio</span><span class="hljs-params">(Score_targets_t press_target)</span> </span>{
+  <span class="hljs-keyword">switch</span> (line_follow_state) {
+    <span class="hljs-keyword">case</span> TURNING_TO_IR_BEACON:
+      <span class="hljs-keyword">if</span> (<span class="hljs-built_in">analogRead</span>(IR_SENSE_1) &gt; IR_BEACON_MIN) {
+        <span class="hljs-built_in">delay</span>(EXIT_TURN_DELAY);
+        drivebase.<span class="hljs-built_in">setLeftPower</span>(HALF_SPEED);
+        drivebase.<span class="hljs-built_in">setRightPower</span>(HALF_SPEED); <span class="hljs-comment">// CHANGED BY ESL *0.95</span>
+        line_follow_state = DRIVING_OUT_OF_STUDIO;
+        <span class="hljs-comment">// line_follow_state = PERPENDICULAR_EXIT;</span>
+        last_time = <span class="hljs-built_in">millis</span>();
+        Serial.<span class="hljs-built_in">println</span>(<span class="hljs-string">&quot;Exiting studio by driving forward&quot;</span>);
+      }
+      <span class="hljs-keyword">break</span>;
+    <span class="hljs-keyword">case</span> PERPENDICULAR_EXIT:
+      <span class="hljs-keyword">if</span> (lineFollow.<span class="hljs-built_in">testForLeftWingBlack</span>() &amp;&amp; lineFollow.<span class="hljs-built_in">testForRightWingBlack</span>()) {
+        last_time = <span class="hljs-built_in">millis</span>();
+        line_follow_state = DRIVING_OUT_OF_STUDIO;
+        drivebase.<span class="hljs-built_in">setLeftPower</span>(QUARTER_SPEED*<span class="hljs-number">0.97</span>);
+        drivebase.<span class="hljs-built_in">setRightPower</span>(QUARTER_SPEED);
+      } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (lineFollow.<span class="hljs-built_in">testForLeftWingBlack</span>()) {
+        drivebase.<span class="hljs-built_in">setLeftPower</span>(<span class="hljs-number">0</span>);
+        drivebase.<span class="hljs-built_in">setRightPower</span>(QUARTER_SPEED);
+      } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (lineFollow.<span class="hljs-built_in">testForRightWingBlack</span>()) {
+        drivebase.<span class="hljs-built_in">setLeftPower</span>(QUARTER_SPEED);
+        drivebase.<span class="hljs-built_in">setRightPower</span>(<span class="hljs-number">0</span>);
+      }
+      <span class="hljs-keyword">break</span>;
+    <span class="hljs-keyword">case</span> DRIVING_OUT_OF_STUDIO:
+      <span class="hljs-comment">// <span class="hljs-doctag">TODO:</span> if timer expired, stop</span>
+      <span class="hljs-comment">// Drive for one second</span>
+      <span class="hljs-keyword">if</span> (<span class="hljs-built_in">millis</span>() - last_time &gt; LEAVE_STUDIO_TIME) {
+        drivebase.<span class="hljs-built_in">stopMotors</span>();
+        line_follow_state = LINE_FOLLOW_UNTIL_LEFT_WING;
+        last_time = <span class="hljs-built_in">millis</span>();
+        Serial.<span class="hljs-built_in">println</span>(<span class="hljs-string">&quot;Driving until left wing&quot;</span>);
+      }
+      <span class="hljs-keyword">break</span>;
+    <span class="hljs-keyword">case</span> LINE_FOLLOW_UNTIL_LEFT_WING:
+      <span class="hljs-comment">// Line follow for a bit before checking the wing too early</span>
+      <span class="hljs-keyword">if</span> (<span class="hljs-built_in">millis</span>() - last_time &gt; LINE_FOLLOW_WAIT &amp;&amp;
+          lineFollow.<span class="hljs-built_in">testForLeftWingRed</span>()) {
+        <span class="hljs-comment">// Determine what state to handle depending on the scoring target</span>
+        <span class="hljs-keyword">if</span> (press_target == GOOD_PRESS) {
+          line_follow_state = LINE_FOLLOW_UNTIL_BLACK_TAPE; <span class="hljs-comment">// Just ignore the tape, keep going</span>
+          state = DRIVING_STUDIO_TO_GOOD;
+          drivebase.<span class="hljs-built_in">setLeftPower</span>(FULL_SPEED);
+          drivebase.<span class="hljs-built_in">setRightPower</span>(FULL_SPEED);
+        } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (press_target == BAD_PRESS) {
+          state = DRIVING_STUDIO_TO_BAD;
+          line_follow_state = TURNING_90_DEG_LEFT_TO_BAD;
+          last_time = <span class="hljs-built_in">millis</span>();
+          Serial.<span class="hljs-built_in">println</span>(<span class="hljs-string">&quot;Beginning turn left to hit the bad press line&quot;</span>);
+          <span class="hljs-comment">// turnTarget = drivebase.getAngle() - 90;</span>
+          drivebase.<span class="hljs-built_in">setLeftPower</span>(<span class="hljs-number">0</span>);
+          drivebase.<span class="hljs-built_in">setRightPower</span>(HALF_SPEED);
+        }
+      } <span class="hljs-keyword">else</span> {
+        <span class="hljs-built_in">followLine</span>();
+      }
+      <span class="hljs-keyword">break</span>;
+
+    <span class="hljs-comment">// case LINE_FOLLOW_UNTIL_BLACK_TAPE: // For testing line follow only, set state to LINE_FOLLOW_UNTIL_BLACK_TAPE in main</span>
+    <span class="hljs-comment">//   followLine();</span>
+    <span class="hljs-comment">//   break;</span>
+    <span class="hljs-keyword">default</span>:
+      Serial.<span class="hljs-built_in">println</span>(<span class="hljs-string">&quot;Something is not good in exiting studio&quot;</span>);
+      <span class="hljs-keyword">break</span>;
+  }
+}
+
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">followLine</span><span class="hljs-params">()</span> </span>{
+  <span class="hljs-comment">// if (millis() % LINE_FOLLOW_UPDATE_FREQ == 0) {</span>
+    <span class="hljs-comment">// Make it simple, then implement PID</span>
+    Motor_powers_t powers = lineFollow.<span class="hljs-built_in">getLineFollowPowers</span>(K_P_LINE_FOLLOW, LINE_FOLLOW_BASE_POWER);
+    drivebase.<span class="hljs-built_in">setLeftPower</span>(powers.left_power);
+    drivebase.<span class="hljs-built_in">setRightPower</span>(powers.right_power);
+  <span class="hljs-comment">// }</span>
+}
+
+<span class="hljs-comment">// After getting to the intersection of the tape driving from studio to good</span>
+<span class="hljs-comment">// press, get to good press</span>
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">handleStudioToGood</span><span class="hljs-params">()</span> </span>{
+  <span class="hljs-keyword">switch</span> (line_follow_state) {
+    <span class="hljs-comment">// case DRIVE_UNTIL_NO_LEFT_WING:</span>
+    <span class="hljs-comment">//   if (!lineFollow.testForLeftWingRed()) {</span>
+    <span class="hljs-comment">//     line_follow_state = LINE_FOLLOW_UNTIL_BLACK_TAPE;</span>
+    <span class="hljs-comment">//     followLine();</span>
+    <span class="hljs-comment">//   }</span>
+    <span class="hljs-comment">//   break;</span>
+    <span class="hljs-keyword">case</span> LINE_FOLLOW_UNTIL_BLACK_TAPE:
+      <span class="hljs-keyword">if</span> (lineFollow.<span class="hljs-built_in">testForBlackTape</span>()) {
+        drivebase.<span class="hljs-built_in">stopMotors</span>();
+        line_follow_state = WAIT_FOR_LINE_FOLLOW_INPUT;
+        state = DISPENSE_ALL_BALLS;
+        last_time = <span class="hljs-built_in">millis</span>();
+      } <span class="hljs-keyword">else</span> {
+        <span class="hljs-built_in">followLine</span>();
+      }
+      <span class="hljs-keyword">break</span>;
+    <span class="hljs-keyword">default</span>:
+      <span class="hljs-keyword">break</span>;
+  }
+}
+
+<span class="hljs-comment">// After getting to the intersection of the tape driving from studio to bad</span>
+<span class="hljs-comment">// press, get to bad press</span>
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">handleStudioToBad</span><span class="hljs-params">()</span> </span>{
+  <span class="hljs-keyword">switch</span> (line_follow_state) {
+    <span class="hljs-keyword">case</span> TURNING_90_DEG_LEFT_TO_BAD:
+      <span class="hljs-comment">// Turned enough to start checking if on line</span>
+      <span class="hljs-keyword">if</span> ((<span class="hljs-built_in">millis</span>() - last_time &gt; TURN_TIME_90_DEG_ONE_HALF_SPD) &amp;&amp; lineFollow.<span class="hljs-built_in">testForOnLine</span>()) {
+        line_follow_state = LINE_FOLLOW_UNTIL_BLACK_TAPE;
+        Serial.<span class="hljs-built_in">println</span>(<span class="hljs-string">&quot;Folw til blk at bad&quot;</span>);
+        <span class="hljs-built_in">followLine</span>();
+      }
+      <span class="hljs-keyword">break</span>;
+    
+      <span class="hljs-comment">// double turn_error = drivebase.calcTurnError(turnTarget);</span>
+      <span class="hljs-comment">// // If turned 90 degrees, follow the line</span>
+      <span class="hljs-comment">// if (abs(turn_error) &lt;= turn_max_error) {</span>
+      <span class="hljs-comment">//   if (!lineFollow.testForOnLine(max_white, min_black)) {</span>
+      <span class="hljs-comment">//     Serial.println(&quot;Turned 90 deg, not on the line, hoping for the</span>
+      <span class="hljs-comment">//     best&quot;);</span>
+      <span class="hljs-comment">//   }</span>
+      <span class="hljs-comment">//   line_follow_state = LINE_FOLLOW_UNTIL_BLACK_TAPE;</span>
+      <span class="hljs-comment">//   followLine();</span>
+      <span class="hljs-comment">//   // Otherwise, keep turning 90 degrees</span>
+      <span class="hljs-comment">// } else {</span>
+      <span class="hljs-comment">//   drivebase.setTurnPIDPowers(turnTarget, k_p_turn);</span>
+      <span class="hljs-comment">// }</span>
+
+      <span class="hljs-comment">// if (!lineFollow.testForOnLine()) {</span>
+      <span class="hljs-comment">//   Serial.println(&quot;Turning 90 deg, not on the line, hoping for the best&quot;);</span>
+      <span class="hljs-comment">// } else {</span>
+      <span class="hljs-comment">//   line_follow_state = LINE_FOLLOW_UNTIL_BLACK_TAPE;</span>
+      <span class="hljs-comment">//   followLine();</span>
+      <span class="hljs-comment">// }</span>
+    <span class="hljs-keyword">case</span> LINE_FOLLOW_UNTIL_BLACK_TAPE:
+      <span class="hljs-keyword">if</span> (lineFollow.<span class="hljs-built_in">testForBlackTape</span>()) {
+        Serial.<span class="hljs-built_in">println</span>(<span class="hljs-string">&quot;Drp bad&quot;</span>);
+        drivebase.<span class="hljs-built_in">stopMotors</span>();
+        state = DISPENSE_TWO_BALLS;
+        line_follow_state = WAIT_FOR_LINE_FOLLOW_INPUT;
+      } <span class="hljs-keyword">else</span> {
+        <span class="hljs-built_in">followLine</span>();
+      }
+  }
+}
+
+<span class="hljs-comment">// Note: Very bad style, uses delay which stops program execution</span>
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">driveTest</span><span class="hljs-params">()</span> </span>{
+  <span class="hljs-comment">// Drive straight at half speed, then stop</span>
+  Serial.<span class="hljs-built_in">println</span>(<span class="hljs-string">&quot;Going forward&quot;</span>);
+  drivebase.<span class="hljs-built_in">setLeftPower</span>(HALF_SPEED);
+  drivebase.<span class="hljs-built_in">setRightPower</span>(HALF_SPEED);
+  <span class="hljs-built_in">delay</span>(<span class="hljs-number">2000</span>);  <span class="hljs-comment">// 2 Seconds</span>
+  drivebase.<span class="hljs-built_in">stopMotors</span>();
+  Serial.<span class="hljs-built_in">println</span>(<span class="hljs-string">&quot;Stopped motors&quot;</span>);
+  <span class="hljs-built_in">delay</span>(<span class="hljs-number">500</span>);
+
+  <span class="hljs-comment">// Turn to (roughly) 90 degrees</span>
+  Serial.<span class="hljs-built_in">println</span>(<span class="hljs-string">&quot;Turning right 90 deg&quot;</span>);
+  drivebase.<span class="hljs-built_in">setLeftPower</span>(HALF_SPEED);
+  drivebase.<span class="hljs-built_in">setRightPower</span>(-HALF_SPEED);
+  <span class="hljs-type">uint8_t</span> count = <span class="hljs-number">0</span>;
+  <span class="hljs-type">uint8_t</span> target = <span class="hljs-number">90</span>;
+  <span class="hljs-type">double</span> error = <span class="hljs-number">0.0</span>;
+  <span class="hljs-keyword">do</span> {
+    error = drivebase.<span class="hljs-built_in">calcTurnError</span>(target);
+    <span class="hljs-keyword">if</span> (count == <span class="hljs-number">0</span>) {  <span class="hljs-comment">// Print every 255 cycles</span>
+      Serial.<span class="hljs-built_in">println</span>(drivebase.<span class="hljs-built_in">getAngle</span>());
+    }
+    count++;
+  } <span class="hljs-keyword">while</span> (<span class="hljs-built_in">abs</span>(error) &gt;= turn_max_error * <span class="hljs-number">10</span>);
+  drivebase.<span class="hljs-built_in">stopMotors</span>();
+  <span class="hljs-built_in">delay</span>(<span class="hljs-number">500</span>);
+
+  <span class="hljs-comment">// Turn (roughly) to 45 degrees</span>
+  Serial.<span class="hljs-built_in">println</span>(<span class="hljs-string">&quot;Turning left 45 deg&quot;</span>);
+  target = <span class="hljs-number">45</span>;
+  drivebase.<span class="hljs-built_in">setLeftPower</span>(-HALF_SPEED);
+  drivebase.<span class="hljs-built_in">setRightPower</span>(HALF_SPEED);
+
+  <span class="hljs-comment">// Keep turning until you got there</span>
+  <span class="hljs-keyword">do</span> {
+    error = drivebase.<span class="hljs-built_in">calcTurnError</span>(target);
+    <span class="hljs-keyword">if</span> (count == <span class="hljs-number">0</span>) {  <span class="hljs-comment">// Print every 255 cycles</span>
+      Serial.<span class="hljs-built_in">println</span>(drivebase.<span class="hljs-built_in">getAngle</span>());
+    }
+    count++;
+  } <span class="hljs-keyword">while</span> (<span class="hljs-built_in">abs</span>(error) &gt;= turn_max_error * <span class="hljs-number">10</span>);
+  drivebase.<span class="hljs-built_in">stopMotors</span>();
+  <span class="hljs-built_in">delay</span>(<span class="hljs-number">500</span>);
+
+  Serial.<span class="hljs-built_in">println</span>(<span class="hljs-string">&quot;Full power forward&quot;</span>);
+  <span class="hljs-comment">// Drive straight at full power</span>
+  drivebase.<span class="hljs-built_in">setLeftPower</span>(FULL_SPEED);
+  drivebase.<span class="hljs-built_in">setRightPower</span>(FULL_SPEED);
+  <span class="hljs-built_in">delay</span>(<span class="hljs-number">1000</span>);
+}
+</code></pre>
+<h2 id="drive">Drive</h2>
+<h3 id="driveh">Drive.h</h3>
+<pre><code class="language-cpp"><span class="hljs-comment">/**
+ * Drive.h contains the exposed methods for the drive subsystem
+ * Get/set gyro position
+ * Set left/right motor
+ */</span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">ifndef</span> Drive_h</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> Drive_h</span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;Adafruit_I2CDevice.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;Adafruit_BNO055.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;inttypes.h&gt;</span></span>
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">Drive</span> {
+ <span class="hljs-keyword">public</span>:
+  <span class="hljs-built_in">Drive</span>(); <span class="hljs-comment">// Allows for drive to be initialized in setup</span>
+  <span class="hljs-built_in">Drive</span>(<span class="hljs-type">uint8_t</span> left_dir_port, <span class="hljs-type">uint8_t</span> left_en_port, <span class="hljs-type">uint8_t</span> right_dir_port,
+        <span class="hljs-type">uint8_t</span> right_en_port, <span class="hljs-type">uint8_t</span> gyro_prt);
+  <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">setLeftInverted</span><span class="hljs-params">(<span class="hljs-type">uint8_t</span> inverted)</span></span>;
+  <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">setRightInverted</span><span class="hljs-params">(<span class="hljs-type">uint8_t</span> inverted)</span></span>;
+  <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">setLeftPower</span><span class="hljs-params">(<span class="hljs-type">int8_t</span> power)</span></span>;
+  <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">setRightPower</span><span class="hljs-params">(<span class="hljs-type">int8_t</span> power)</span></span>;
+  <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">stopMotors</span><span class="hljs-params">()</span></span>;
+  <span class="hljs-function"><span class="hljs-type">double</span> <span class="hljs-title">getAngle</span><span class="hljs-params">()</span></span>;
+  <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">setGyroOffset</span><span class="hljs-params">(<span class="hljs-type">double</span> offset)</span></span>;
+  <span class="hljs-function"><span class="hljs-type">double</span> <span class="hljs-title">calcTurnError</span><span class="hljs-params">(<span class="hljs-type">double</span> target_angle)</span></span>;
+  <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">setTurnPIDPowers</span><span class="hljs-params">(<span class="hljs-type">double</span> target_angle, <span class="hljs-type">double</span> k_p)</span></span>; 
+  <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">printDebug</span><span class="hljs-params">()</span></span>;
+
+ <span class="hljs-keyword">private</span>:
+  <span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">isLeftInverted</span><span class="hljs-params">()</span></span>;
+  <span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">isRightInverted</span><span class="hljs-params">()</span></span>;
+  <span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">leftDir</span><span class="hljs-params">()</span></span>;
+  <span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">rightDir</span><span class="hljs-params">()</span></span>;
+  <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">setRightDir</span><span class="hljs-params">(<span class="hljs-type">uint8_t</span> dir)</span></span>;
+  <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">setLeftDir</span><span class="hljs-params">(<span class="hljs-type">uint8_t</span> dir)</span></span>;
+  <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">setGyroInit</span><span class="hljs-params">()</span></span>;
+  <span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">getGyroInit</span><span class="hljs-params">()</span></span>;
+  <span class="hljs-type">uint8_t</span> l_dir_port;
+  <span class="hljs-type">uint8_t</span> l_en_port;
+  <span class="hljs-type">uint8_t</span> r_dir_port;
+  <span class="hljs-type">uint8_t</span> r_en_port;
+  <span class="hljs-type">uint8_t</span> gyro_port;
+
+  <span class="hljs-comment">/* Structure of invertsAndState:
+    0, 0, 0, gyroInitialized, LeftInverted, RightInverted, LeftDir, RightDir
+      */</span>
+  <span class="hljs-type">uint8_t</span> inverts_and_states;  <span class="hljs-comment">// Each bit is different info</span>
+  Adafruit_BNO055 gyro;
+  <span class="hljs-type">double</span> gyro_offset;
+};
+
+<span class="hljs-meta">#<span class="hljs-keyword">endif</span></span>
+</code></pre>
+<h3 id="drivecpp">Drive.cpp</h3>
+<pre><code class="language-cpp"><span class="hljs-comment">/**
+ * Drive.cpp is the implementation for the drive subsystem
+ */</span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;Drive.h&quot;</span></span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> USE_EXT_CRYSTAL true</span>
+
+<span class="hljs-comment">/* Structure of invertsAndState:
+    0, 0, 0, GyroInit, LeftInverted, RightInverted, LeftDir, RightDir
+*/</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> GYRO_INIT_MASK (uint8_t)0b10000</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> LEFT_INVERT_MASK (uint8_t)0b1000</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> RIGHT_INVERT_MASK (uint8_t)0b0100</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> LEFT_DIR_MASK (uint8_t)0b0010</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> RIGHT_DIR_MASK (uint8_t)0b0001</span>
+
+<span class="hljs-comment">// DO NOT CHANGE THESE, bitmasks depend on forward = 0, backward = 1</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> FORWARD (uint8_t)0</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> BACKWARD (uint8_t)1</span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> LEFT_SCALAR 1.0 <span class="hljs-comment">// was 0.95 ESL</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> RIGHT_SCALAR 0.97 <span class="hljs-comment">// was 0.1 ESL</span></span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> GYRO_DEGREES 360.0  <span class="hljs-comment">// Max value from gyro (0 - 359.9999)</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> GYRO_HALF_DEGREES (GYRO_DEGREES / 2)</span>
+
+Drive::<span class="hljs-built_in">Drive</span>() {
+  <span class="hljs-comment">// Ports default to garbage values</span>
+  inverts_and_states = <span class="hljs-number">0</span>;
+}
+
+Drive::<span class="hljs-built_in">Drive</span>(<span class="hljs-type">uint8_t</span> left_dir_port, <span class="hljs-type">uint8_t</span> left_en_port,
+             <span class="hljs-type">uint8_t</span> right_dir_port, <span class="hljs-type">uint8_t</span> right_en_port, <span class="hljs-type">uint8_t</span> gyro_prt) {
+  <span class="hljs-comment">// State initialization</span>
+  inverts_and_states = <span class="hljs-number">0</span>;
+
+  <span class="hljs-comment">// Gyro initialization</span>
+  gyro_offset = <span class="hljs-number">0</span>;
+  gyro_port = gyro_prt;
+
+  <span class="hljs-comment">// // Init gyro to pass to drivebase</span>
+  <span class="hljs-comment">// if (!gyro.begin()) {</span>
+  <span class="hljs-comment">//   Serial.println(&quot;No gyro detected&quot;);</span>
+  <span class="hljs-comment">// }</span>
+  <span class="hljs-comment">// gyro.setExtCrystalUse(true);</span>
+  <span class="hljs-comment">// setGyroInit();</span>
+
+  <span class="hljs-comment">// Motor initialization</span>
+  l_dir_port = left_dir_port;
+  l_en_port = left_en_port;
+  r_dir_port = right_dir_port;
+  r_en_port = right_en_port;
+
+  <span class="hljs-built_in">pinMode</span>(l_dir_port, OUTPUT);
+  <span class="hljs-built_in">pinMode</span>(l_en_port, OUTPUT);
+  <span class="hljs-built_in">pinMode</span>(r_dir_port, OUTPUT);
+  <span class="hljs-built_in">pinMode</span>(r_en_port, OUTPUT);
+  <span class="hljs-built_in">digitalWrite</span>(l_dir_port, LOW);
+  <span class="hljs-built_in">digitalWrite</span>(r_dir_port, LOW);
+  <span class="hljs-built_in">analogWrite</span>(l_en_port, LOW);
+  <span class="hljs-built_in">analogWrite</span>(r_en_port, LOW);
+
+  <span class="hljs-built_in">setLeftDir</span>(FORWARD);
+  <span class="hljs-built_in">setRightDir</span>(FORWARD);
+  <span class="hljs-built_in">stopMotors</span>();
+}
+
+<span class="hljs-comment">// Set direction of the motors</span>
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">Drive::setRightDir</span><span class="hljs-params">(<span class="hljs-type">uint8_t</span> dir)</span> </span>{
+  <span class="hljs-keyword">if</span> (dir == BACKWARD) {
+    inverts_and_states |= RIGHT_DIR_MASK;  <span class="hljs-comment">// Turn on</span>
+    <span class="hljs-built_in">digitalWrite</span>(r_dir_port, HIGH);
+  } <span class="hljs-keyword">else</span> {
+    inverts_and_states &amp;= ~RIGHT_DIR_MASK;  <span class="hljs-comment">// Turn off</span>
+    <span class="hljs-built_in">digitalWrite</span>(r_dir_port, LOW);
+  }
+}
+
+<span class="hljs-comment">// Set direction of the motors</span>
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">Drive::setLeftDir</span><span class="hljs-params">(<span class="hljs-type">uint8_t</span> dir)</span> </span>{
+  <span class="hljs-keyword">if</span> (dir == BACKWARD) {
+    inverts_and_states |= LEFT_DIR_MASK;  <span class="hljs-comment">// Turn on</span>
+    <span class="hljs-built_in">digitalWrite</span>(l_dir_port, HIGH);
+  } <span class="hljs-keyword">else</span> {
+    inverts_and_states &amp;= ~LEFT_DIR_MASK;  <span class="hljs-comment">// Turn off</span>
+    <span class="hljs-built_in">digitalWrite</span>(l_dir_port, LOW);
+  }
+}
+
+<span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">Drive::isLeftInverted</span><span class="hljs-params">()</span> </span>{ <span class="hljs-keyword">return</span> inverts_and_states &amp; LEFT_INVERT_MASK; }
+
+<span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">Drive::isRightInverted</span><span class="hljs-params">()</span> </span>{ <span class="hljs-keyword">return</span> inverts_and_states &amp; RIGHT_INVERT_MASK; }
+
+<span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">Drive::leftDir</span><span class="hljs-params">()</span> </span>{ <span class="hljs-keyword">return</span> inverts_and_states &amp; LEFT_DIR_MASK; }
+
+<span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">Drive::rightDir</span><span class="hljs-params">()</span> </span>{ <span class="hljs-keyword">return</span> inverts_and_states &amp; RIGHT_DIR_MASK; }
+
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">Drive::setGyroInit</span><span class="hljs-params">()</span> </span>{ inverts_and_states |= GYRO_INIT_MASK; }
+
+<span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">Drive::getGyroInit</span><span class="hljs-params">()</span> </span>{ <span class="hljs-keyword">return</span> inverts_and_states &amp; GYRO_INIT_MASK; }
+
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">Drive::setLeftInverted</span><span class="hljs-params">(<span class="hljs-type">uint8_t</span> inverted)</span> </span>{
+  <span class="hljs-keyword">if</span> (inverted == BACKWARD) {
+    inverts_and_states |= LEFT_INVERT_MASK;  <span class="hljs-comment">// Turn on invert</span>
+  } <span class="hljs-keyword">else</span> {
+    inverts_and_states &amp;= ~LEFT_INVERT_MASK;  <span class="hljs-comment">// Turn off invert</span>
+  }
+}
+
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">Drive::setRightInverted</span><span class="hljs-params">(<span class="hljs-type">uint8_t</span> inverted)</span> </span>{
+  <span class="hljs-keyword">if</span> (inverted == BACKWARD) {
+    inverts_and_states |= RIGHT_INVERT_MASK;  <span class="hljs-comment">// Turn on invert</span>
+  } <span class="hljs-keyword">else</span> {
+    inverts_and_states &amp;= ~RIGHT_INVERT_MASK;  <span class="hljs-comment">// Turn off invert</span>
+  }
+}
+
+<span class="hljs-comment">// Set left power between -128 and 127</span>
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">Drive::setLeftPower</span><span class="hljs-params">(<span class="hljs-type">int8_t</span> power)</span> </span>{
+  <span class="hljs-comment">// Make motor go forward with positive power, or backward if it&#x27;s negative</span>
+  <span class="hljs-comment">// power</span>
+  <span class="hljs-keyword">if</span> (power &gt;= <span class="hljs-number">0</span>) {
+    <span class="hljs-keyword">if</span> (<span class="hljs-built_in">isLeftInverted</span>()) {
+      <span class="hljs-built_in">setLeftDir</span>(BACKWARD);
+    } <span class="hljs-keyword">else</span> {
+      <span class="hljs-built_in">setLeftDir</span>(FORWARD);
+    }
+  }
+  <span class="hljs-comment">// Power is negative, change direction of the motor</span>
+  <span class="hljs-keyword">else</span> {
+    <span class="hljs-keyword">if</span> (<span class="hljs-built_in">isLeftInverted</span>()) {
+      <span class="hljs-built_in">setLeftDir</span>(FORWARD);
+    } <span class="hljs-keyword">else</span> {
+      <span class="hljs-built_in">setLeftDir</span>(BACKWARD);
+    }
+  }
+
+  <span class="hljs-comment">// Set PWM power, converting the negative/positive range into a 0-255 output</span>
+  <span class="hljs-comment">// Input is between -127 to 128, which shows direction and magnitude</span>
+  <span class="hljs-comment">// Want the power to be between 0 to 255, so multiply abs(input) by 2</span>
+  <span class="hljs-built_in">analogWrite</span>(l_en_port, <span class="hljs-built_in">uint8_t</span>(((<span class="hljs-built_in">abs</span>(power)) &lt;&lt; <span class="hljs-number">1</span>) * LEFT_SCALAR));
+}
+
+<span class="hljs-comment">// Set right power between -128 and 127</span>
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">Drive::setRightPower</span><span class="hljs-params">(<span class="hljs-type">int8_t</span> power)</span> </span>{
+  <span class="hljs-comment">// Make motor go forward with positive power, or backward if it&#x27;s negative</span>
+  <span class="hljs-comment">// power</span>
+  <span class="hljs-keyword">if</span> (power &gt;= <span class="hljs-number">0</span>) {
+    <span class="hljs-keyword">if</span> (<span class="hljs-built_in">isRightInverted</span>()) {
+      <span class="hljs-built_in">setRightDir</span>(BACKWARD);
+    } <span class="hljs-keyword">else</span> {
+      <span class="hljs-built_in">setRightDir</span>(FORWARD);
+    }
+  }
+  <span class="hljs-comment">// Power is negative, change direction of the motor</span>
+  <span class="hljs-keyword">else</span> {
+    <span class="hljs-keyword">if</span> (<span class="hljs-built_in">isRightInverted</span>()) {
+      <span class="hljs-built_in">setRightDir</span>(FORWARD);
+    } <span class="hljs-keyword">else</span> {
+      <span class="hljs-built_in">setRightDir</span>(BACKWARD);
+    }
+  }
+
+  <span class="hljs-comment">// Set PWM power, converting the negative/positive range into a 0-255 output</span>
+  <span class="hljs-comment">// Input is between -127 to 128, which shows direction and magnitude</span>
+  <span class="hljs-comment">// Want the power to be between 0 to 255, so multiply abs(input) by 2</span>
+  <span class="hljs-built_in">analogWrite</span>(r_en_port, <span class="hljs-built_in">uint8_t</span>(((<span class="hljs-built_in">abs</span>(power)) &lt;&lt; <span class="hljs-number">1</span>) * RIGHT_SCALAR));
+}
+
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">Drive::stopMotors</span><span class="hljs-params">()</span> </span>{
+  <span class="hljs-built_in">setRightPower</span>(<span class="hljs-number">0</span>);
+  <span class="hljs-built_in">setLeftPower</span>(<span class="hljs-number">0</span>);
+}
+
+<span class="hljs-function"><span class="hljs-type">double</span> <span class="hljs-title">Drive::getAngle</span><span class="hljs-params">()</span> </span>{
+  <span class="hljs-keyword">if</span> (<span class="hljs-built_in">getGyroInit</span>()) {
+    <span class="hljs-type">double</span> yaw =
+        gyro.<span class="hljs-built_in">getVector</span>(Adafruit_BNO055::VECTOR_EULER).<span class="hljs-built_in">x</span>() - gyro_offset;
+
+    <span class="hljs-comment">// Get a range from [0, 360.0) with offset (if offset is 50, want 0 (-50) to</span>
+    <span class="hljs-comment">// now map to 310.0)</span>
+    <span class="hljs-keyword">if</span> (yaw &lt; <span class="hljs-number">0</span>) {
+      <span class="hljs-keyword">return</span> yaw + GYRO_DEGREES;
+    } <span class="hljs-keyword">else</span> {
+      <span class="hljs-keyword">return</span> yaw;
+    }
+  }
+  <span class="hljs-keyword">return</span> <span class="hljs-number">-1</span>;  <span class="hljs-comment">// Error, gyro not initialized</span>
+}
+
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">Drive::setGyroOffset</span><span class="hljs-params">(<span class="hljs-type">double</span> offset)</span> </span>{
+  gyro_offset = offset;  <span class="hljs-comment">// Can be used so 0 is always when the robot IR sensor</span>
+                         <span class="hljs-comment">// is facing the beacon</span>
+}
+
+<span class="hljs-comment">/**
+ * Get the turn error (to use for PID turning), limited from -180 to 180.
+ * @param target_angle should be between 0 and 359 (absolute target), but can be between [-360.0, inf)
+*/</span>
+<span class="hljs-function"><span class="hljs-type">double</span> <span class="hljs-title">Drive::calcTurnError</span><span class="hljs-params">(<span class="hljs-type">double</span> target_angle)</span> </span>{
+  <span class="hljs-comment">// Normalize the target angle</span>
+  <span class="hljs-keyword">if</span> (target_angle &gt; GYRO_DEGREES) {
+    target_angle = <span class="hljs-built_in">fmod</span>(target_angle, GYRO_DEGREES);
+  <span class="hljs-comment">// fmod doesn&#x27;t work the way I want it to with negatives (remainder still negative), so this is a way of fixing angles between -360.0 and 0</span>
+  } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (target_angle &lt; <span class="hljs-number">0</span>) {
+    target_angle += GYRO_DEGREES;
+  }
+
+  <span class="hljs-type">double</span> error = target_angle - <span class="hljs-built_in">getAngle</span>();
+  <span class="hljs-keyword">if</span> (error &gt; GYRO_HALF_DEGREES) {
+    error -= GYRO_DEGREES;
+  }
+  <span class="hljs-keyword">return</span> error;
+}
+
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">Drive::setTurnPIDPowers</span><span class="hljs-params">(<span class="hljs-type">double</span> target_angle, <span class="hljs-type">double</span> k_p)</span> </span>{
+  <span class="hljs-type">double</span> error = <span class="hljs-built_in">calcTurnError</span>(target_angle);
+  <span class="hljs-type">double</span> product = error * k_p;
+  <span class="hljs-comment">// Cap powers to max inputs</span>
+  <span class="hljs-keyword">if</span> (<span class="hljs-built_in">abs</span>(product) &gt; INT8_MAX) {
+    product = <span class="hljs-built_in">copysign</span>(INT8_MAX, product);
+  }
+  <span class="hljs-built_in">setLeftPower</span>(product);
+  <span class="hljs-built_in">setRightPower</span>(-product);
+}
+
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">Drive::printDebug</span><span class="hljs-params">()</span> </span>{
+  Serial.<span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;Gyro angle: &quot;</span>);
+  Serial.<span class="hljs-built_in">println</span>(<span class="hljs-built_in">getAngle</span>());
+}
+
+</code></pre>
+<h2 id="hopper">Hopper</h2>
+<h3 id="hopperh">Hopper.h</h3>
+<pre><code class="language-cpp"><span class="hljs-comment">/**
+ * Wrapper for the hopper subsystem, allows user to drop x number of balls
+*/</span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">ifndef</span> Hopper_h</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> Hopper_h</span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;Servo.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;inttypes.h&gt;</span></span>
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">Hopper</span> {
+  <span class="hljs-keyword">public</span>:
+    <span class="hljs-built_in">Hopper</span>(); <span class="hljs-comment">// Only to initialize at first</span>
+    <span class="hljs-built_in">Hopper</span>(Servo &amp;servo, <span class="hljs-type">uint8_t</span> servo_port);
+    <span class="hljs-comment">/**
+     * <span class="hljs-doctag">NOTE:</span> These functions use delay to get the correct timing (not the best practice)
+    */</span>
+    <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">dropTwoBalls</span><span class="hljs-params">()</span></span>;
+    <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">dropAllBalls</span><span class="hljs-params">()</span></span>;
+    <span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">isInitialized</span><span class="hljs-params">()</span></span>;
+  <span class="hljs-keyword">private</span>:
+    Servo _servo;
+    <span class="hljs-type">bool</span> _is_attached;
+};
+
+<span class="hljs-meta">#<span class="hljs-keyword">endif</span></span>
+
+</code></pre>
+<h3 id="hoppercpp">Hopper.cpp</h3>
+<pre><code class="language-cpp"><span class="hljs-comment">/**
+ * Hopper subsystem wrapper
+ */</span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;Arduino.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;Hopper.h&gt;</span></span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> DEFAULT_ANGLE 180</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> DROP_ANGLE 135</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> DROP_ONE_TIME 175 <span class="hljs-comment">// Was 125 before servo change</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> DROP_ALL_TIME 700</span>
+
+Hopper::<span class="hljs-built_in">Hopper</span>() { _is_attached = <span class="hljs-literal">false</span>; }
+
+Hopper::<span class="hljs-built_in">Hopper</span>(Servo &amp;servo, <span class="hljs-type">uint8_t</span> servo_port) {
+  _servo = servo;
+  _servo.<span class="hljs-built_in">attach</span>(servo_port);
+  _servo.<span class="hljs-built_in">write</span>(DEFAULT_ANGLE);
+  _is_attached = <span class="hljs-literal">true</span>;
+}
+
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">Hopper::dropTwoBalls</span><span class="hljs-params">()</span> </span>{
+  <span class="hljs-keyword">if</span> (_is_attached) {
+    _servo.<span class="hljs-built_in">write</span>(DROP_ANGLE);
+    <span class="hljs-built_in">delay</span>(DROP_ONE_TIME);
+    _servo.<span class="hljs-built_in">write</span>(DEFAULT_ANGLE);
+  } <span class="hljs-keyword">else</span> {
+    Serial.<span class="hljs-built_in">println</span>(<span class="hljs-string">&quot;Servo not attached!&quot;</span>);
+  }
+}
+
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">Hopper::dropAllBalls</span><span class="hljs-params">()</span> </span>{
+  <span class="hljs-keyword">if</span> (_is_attached) {
+    _servo.<span class="hljs-built_in">write</span>(DROP_ANGLE);
+    <span class="hljs-built_in">delay</span>(DROP_ALL_TIME);
+    _servo.<span class="hljs-built_in">write</span>(DEFAULT_ANGLE);
+  } <span class="hljs-keyword">else</span> {
+    Serial.<span class="hljs-built_in">println</span>(<span class="hljs-string">&quot;Servo not attached!&quot;</span>);
+  }
+}
+
+<span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">Hopper::isInitialized</span><span class="hljs-params">()</span> </span>{
+    <span class="hljs-keyword">return</span> _is_attached;
+}
+</code></pre>
+<h2 id="line-follow">Line Follow</h2>
+<h3 id="linefollowh">LineFollow.h</h3>
+<pre><code class="language-cpp"><span class="hljs-comment">/**
+ * LineFollow.h defines all of the exposed methods for the line following subsystem, including using its five tape sensors
+*/</span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">ifndef</span> LineFollow_h</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> LineFollow_h</span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;inttypes.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;LineDataTypes.h&gt;</span></span>
+
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">LineFollow</span> {
+  <span class="hljs-keyword">public</span>:
+    <span class="hljs-comment">/**
+     * Pass in the ports for the tape sensors on the robot
+    */</span>
+    <span class="hljs-built_in">LineFollow</span>(<span class="hljs-type">uint8_t</span> left_wing, <span class="hljs-type">uint8_t</span> line_left, <span class="hljs-type">uint8_t</span> line_right,
+                       <span class="hljs-type">uint8_t</span> right_wing, Line_thresholds_t thresholds); 
+    <span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">testForBlackTape</span><span class="hljs-params">()</span></span>;
+    <span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">testForLeftWingBlack</span><span class="hljs-params">()</span></span>; <span class="hljs-comment">// added ESL</span>
+    <span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">testForRightWingBlack</span><span class="hljs-params">()</span></span>; <span class="hljs-comment">// added ESL</span>
+    <span class="hljs-comment">/**
+     * Check if the left wing sees red tape (given max value for white, and min value for black tape)
+    */</span>
+    <span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">testForLeftWingRed</span><span class="hljs-params">()</span></span>;
+    <span class="hljs-comment">/**
+     * Check if the left wing sees either red or black tape
+    */</span>
+    <span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">testForRightWingRed</span><span class="hljs-params">()</span></span>;
+    <span class="hljs-comment">/**
+     * Get the error for PID line follow, given the difference between the center and right/left wings when the robot is centered over the line
+    */</span>
+    <span class="hljs-function">Motor_powers_t <span class="hljs-title">getLineFollowPowers</span><span class="hljs-params">(<span class="hljs-type">double</span> k_p, <span class="hljs-type">int8_t</span> base_power)</span></span>; <span class="hljs-comment">// <span class="hljs-doctag">TODO:</span> Add P for smoother line follow</span>
+    <span class="hljs-comment">/**
+     * Check that any of the line sensors (middle 3) are on the line
+    */</span>
+    <span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">testForOnLine</span><span class="hljs-params">()</span></span>;
+    <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">printDebug</span><span class="hljs-params">()</span></span>;
+    <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">setThresholds</span><span class="hljs-params">(Line_thresholds_t thresholds)</span></span>;
+    <span class="hljs-function">Line_sensor_vals_t <span class="hljs-title">LineFollow::getSensorReadings</span><span class="hljs-params">()</span></span>;
+
+  <span class="hljs-keyword">private</span>:
+    <span class="hljs-type">uint8_t</span> _left_wing;
+    <span class="hljs-type">uint8_t</span> _line_left;
+    <span class="hljs-type">uint8_t</span> _line_right;
+    <span class="hljs-type">uint8_t</span> _right_wing;
+    Line_thresholds_t _thresholds;
+    <span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">isRed</span><span class="hljs-params">(<span class="hljs-type">uint16_t</span> sensor_value, <span class="hljs-type">uint16_t</span> min_white,
+                       <span class="hljs-type">uint16_t</span> max_red, <span class="hljs-type">uint16_t</span> max_black)</span></span>;
+    <span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">isBlack</span><span class="hljs-params">(<span class="hljs-type">uint16_t</span> sensor_value, <span class="hljs-type">uint16_t</span> max_red)</span></span>;
+
+};
+<span class="hljs-meta">#<span class="hljs-keyword">endif</span></span>
+</code></pre>
+<h3 id="linefollowcpp">LineFollow.cpp</h3>
+<pre><code class="language-cpp"><span class="hljs-comment">/**
+ * LineFollow.cpp is the class for using 5 tape sensors to follow a line and
+ * detect intersections
+ */</span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;LineFollow.h&quot;</span></span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;Arduino.h&gt;</span></span>
+
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> RED_BLACK_WIGGLE_ROOM 125 <span class="hljs-comment">// Was 150, then 125 (now that red tape is 370) // was 100 before comp ESL</span></span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> SENSOR_NOISE 3 <span class="hljs-comment">// Was 20, then 10 </span></span>
+
+LineFollow::<span class="hljs-built_in">LineFollow</span>(<span class="hljs-type">uint8_t</span> left_wing, <span class="hljs-type">uint8_t</span> line_left, <span class="hljs-type">uint8_t</span> line_right,
+                       <span class="hljs-type">uint8_t</span> right_wing, Line_thresholds_t thresholds) {
+  _left_wing = left_wing;
+  _line_left = line_left;
+  _line_right = line_right;
+  _right_wing = right_wing;
+  _thresholds = thresholds;
+}
+
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">LineFollow::setThresholds</span><span class="hljs-params">(Line_thresholds_t thresholds)</span> </span>{
+  _thresholds = thresholds;
+}
+
+<span class="hljs-function">Line_sensor_vals_t <span class="hljs-title">LineFollow::getSensorReadings</span><span class="hljs-params">()</span> </span>{
+  <span class="hljs-keyword">return</span> {<span class="hljs-built_in">analogRead</span>(_left_wing), <span class="hljs-built_in">analogRead</span>(_right_wing),
+          <span class="hljs-built_in">analogRead</span>(_line_left), <span class="hljs-built_in">analogRead</span>(_line_right)};
+}
+
+<span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">LineFollow::testForBlackTape</span><span class="hljs-params">()</span> </span>{
+  <span class="hljs-comment">// Check if any of the sensors detect black tape</span>
+  <span class="hljs-type">bool</span> lw_black = <span class="hljs-built_in">isBlack</span>(<span class="hljs-built_in">analogRead</span>(_left_wing), _thresholds.max_lw_red);
+  <span class="hljs-comment">// bool ll_black = isBlack(analogRead(_line_left), _thresholds.max_ll_red);</span>
+  <span class="hljs-comment">// bool lr_black = isBlack(analogRead(_line_right), _thresholds.max_lr_red);</span>
+  <span class="hljs-type">bool</span> rw_black = <span class="hljs-built_in">isBlack</span>(<span class="hljs-built_in">analogRead</span>(_right_wing), _thresholds.max_rw_red);
+
+  <span class="hljs-comment">// <span class="hljs-doctag">TODO:</span> Only for testing</span>
+  <span class="hljs-comment">// if (lw_black) {</span>
+  <span class="hljs-comment">//   Serial.println(&quot;Left wing black&quot;);</span>
+  <span class="hljs-comment">// }</span>
+  <span class="hljs-comment">// if (ll_black) {</span>
+  <span class="hljs-comment">//   Serial.println(&quot;Line left black&quot;);</span>
+  <span class="hljs-comment">// }</span>
+  <span class="hljs-comment">// if (lr_black) {</span>
+  <span class="hljs-comment">//   Serial.println(&quot;Line right black&quot;);</span>
+  <span class="hljs-comment">// }</span>
+  <span class="hljs-comment">// if (rw_black) {</span>
+  <span class="hljs-comment">//   Serial.println(&quot;Right wing black&quot;);</span>
+  <span class="hljs-comment">// }</span>
+
+
+  <span class="hljs-keyword">return</span> rw_black;
+}
+
+<span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">LineFollow::testForLeftWingBlack</span><span class="hljs-params">()</span> </span>{ <span class="hljs-comment">// ESL</span>
+  <span class="hljs-keyword">return</span> <span class="hljs-built_in">isBlack</span>(<span class="hljs-built_in">analogRead</span>(_left_wing), _thresholds.max_lw_red);
+}
+
+<span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">LineFollow::testForRightWingBlack</span><span class="hljs-params">()</span> </span>{ <span class="hljs-comment">// ESL</span>
+  <span class="hljs-keyword">return</span> <span class="hljs-built_in">isBlack</span>(<span class="hljs-built_in">analogRead</span>(_right_wing), _thresholds.max_rw_red);
+}
+
+<span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">LineFollow::testForLeftWingRed</span><span class="hljs-params">()</span> </span>{
+  <span class="hljs-keyword">return</span> <span class="hljs-built_in">isRed</span>(<span class="hljs-built_in">analogRead</span>(_left_wing), _thresholds.min_lw_white,
+               _thresholds.max_lw_red, _thresholds.max_lw_black);
+}
+
+<span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">LineFollow::testForRightWingRed</span><span class="hljs-params">()</span> </span>{
+  <span class="hljs-keyword">return</span> <span class="hljs-built_in">isRed</span>(<span class="hljs-built_in">analogRead</span>(_right_wing), _thresholds.min_rw_white,
+               _thresholds.max_rw_red, _thresholds.max_rw_black);
+}
+
+<span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">LineFollow::testForOnLine</span><span class="hljs-params">()</span> </span>{
+  <span class="hljs-type">bool</span> is_left_red = <span class="hljs-built_in">isRed</span>(<span class="hljs-built_in">analogRead</span>(_line_left), _thresholds.min_ll_white,
+                           _thresholds.max_ll_red, _thresholds.max_ll_black);
+  <span class="hljs-type">bool</span> is_right_red = <span class="hljs-built_in">isRed</span>(<span class="hljs-built_in">analogRead</span>(_line_right), _thresholds.min_lr_white,
+                            _thresholds.max_lr_red, _thresholds.max_lr_black);
+  <span class="hljs-keyword">return</span> is_left_red || is_right_red;
+}
+
+<span class="hljs-function">Motor_powers_t <span class="hljs-title">LineFollow::getLineFollowPowers</span><span class="hljs-params">(<span class="hljs-type">double</span> k_p, <span class="hljs-type">int8_t</span> base_power)</span> </span>{
+  <span class="hljs-type">uint16_t</span> left_value = <span class="hljs-built_in">analogRead</span>(_line_left);
+  <span class="hljs-type">uint16_t</span> right_value = <span class="hljs-built_in">analogRead</span>(_line_right) + <span class="hljs-number">1</span>;
+
+  <span class="hljs-type">int16_t</span> error = left_value - right_value;
+  <span class="hljs-comment">// double pid_output = error * k_p;</span>
+  <span class="hljs-keyword">if</span> (<span class="hljs-built_in">abs</span>(error) &lt; SENSOR_NOISE) {
+    <span class="hljs-keyword">return</span> {(base_power &gt;&gt; <span class="hljs-number">2</span>) * <span class="hljs-number">3</span>, (base_power &gt;&gt; <span class="hljs-number">2</span>) * <span class="hljs-number">3</span>}; <span class="hljs-comment">// Fast 7/8 power for straight line (&gt;&gt; 3 for /8, * 7 for 7/8)</span>
+  } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (right_value &gt; (left_value + SENSOR_NOISE)) {
+    <span class="hljs-comment">// Turn right</span>
+    <span class="hljs-keyword">return</span> {base_power, <span class="hljs-number">0</span>};
+  } <span class="hljs-keyword">else</span> {
+    <span class="hljs-comment">// Turn left</span>
+    <span class="hljs-comment">// If left value more than right value, it is more red, therefore, turn left</span>
+    <span class="hljs-keyword">return</span> {<span class="hljs-number">0</span>, base_power};
+  }
+  
+}
+
+<span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">LineFollow::isRed</span><span class="hljs-params">(<span class="hljs-type">uint16_t</span> sensor_value, <span class="hljs-type">uint16_t</span> min_white,
+                       <span class="hljs-type">uint16_t</span> max_red, <span class="hljs-type">uint16_t</span> max_black)</span> </span>{
+  <span class="hljs-type">uint16_t</span> max_white = (min_white + max_red) &gt;&gt; <span class="hljs-number">1</span>;  <span class="hljs-comment">// Divide by 2 for average</span>
+  <span class="hljs-type">uint16_t</span> min_black = (max_red + RED_BLACK_WIGGLE_ROOM);
+  <span class="hljs-keyword">return</span> (sensor_value &gt; max_white) &amp;&amp; (sensor_value &lt; min_black);
+}
+
+<span class="hljs-function"><span class="hljs-type">bool</span> <span class="hljs-title">LineFollow::isBlack</span><span class="hljs-params">(<span class="hljs-type">uint16_t</span> sensor_value, <span class="hljs-type">uint16_t</span> max_red)</span> </span>{
+  <span class="hljs-keyword">return</span> sensor_value &gt; (max_red + RED_BLACK_WIGGLE_ROOM);
+}
+
+<span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">LineFollow::printDebug</span><span class="hljs-params">()</span> </span>{
+  Serial.<span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;LW: &quot;</span>);
+  Serial.<span class="hljs-built_in">println</span>(<span class="hljs-built_in">analogRead</span>(_left_wing));
+  Serial.<span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;LineL: &quot;</span>);
+  Serial.<span class="hljs-built_in">println</span>(<span class="hljs-built_in">analogRead</span>(_line_left));
+  Serial.<span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;LineR: &quot;</span>);
+  Serial.<span class="hljs-built_in">println</span>(<span class="hljs-built_in">analogRead</span>(_line_right));
+  Serial.<span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;RW: &quot;</span>);
+  Serial.<span class="hljs-built_in">println</span>(<span class="hljs-built_in">analogRead</span>(_right_wing));
+}
+</code></pre>
+<h3 id="linedatatypesh">LineDataTypes.h</h3>
+<pre><code class="language-cpp"><span class="hljs-meta">#<span class="hljs-keyword">ifndef</span> LineDataTypes_h</span>
+<span class="hljs-meta">#<span class="hljs-keyword">define</span> LineDataTypes_h</span>
+<span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;inttypes.h&gt;</span></span>
+
+<span class="hljs-keyword">typedef</span> <span class="hljs-keyword">struct</span> {
+  <span class="hljs-type">int8_t</span> left_power;
+  <span class="hljs-type">int8_t</span> right_power;
+} Motor_powers_t;
+
+<span class="hljs-keyword">typedef</span> <span class="hljs-keyword">struct</span> {
+  <span class="hljs-type">uint16_t</span> min_lw_white;
+  <span class="hljs-type">uint16_t</span> max_lw_red;
+  <span class="hljs-type">uint16_t</span> max_lw_black;
+
+  <span class="hljs-type">uint16_t</span> min_ll_white;
+  <span class="hljs-type">uint16_t</span> max_ll_red;
+  <span class="hljs-type">uint16_t</span> max_ll_black;
+
+  <span class="hljs-type">uint16_t</span> min_lr_white;
+  <span class="hljs-type">uint16_t</span> max_lr_red;
+  <span class="hljs-type">uint16_t</span> max_lr_black;
+
+  <span class="hljs-type">uint16_t</span> min_rw_white;
+  <span class="hljs-type">uint16_t</span> max_rw_red;
+  <span class="hljs-type">uint16_t</span> max_rw_black;
+} Line_thresholds_t;
+
+<span class="hljs-keyword">typedef</span> <span class="hljs-keyword">struct</span> {
+  <span class="hljs-type">uint16_t</span> lw;
+  <span class="hljs-type">uint16_t</span> ll;
+  <span class="hljs-type">uint16_t</span> lr;
+  <span class="hljs-type">uint16_t</span> rw;
+} Line_sensor_vals_t;
+
+<span class="hljs-meta">#<span class="hljs-keyword">endif</span></span>
+</code></pre>
 
         
         
