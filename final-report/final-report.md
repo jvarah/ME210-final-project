@@ -21,7 +21,7 @@ Component List:
 
 All project members were also members of “Stanford Archery” at the time. To show off their club spirt and to add some pizzazz to the design, the Stanford Archery logo was laser cut into each of the chassis’s side supports.
 
-![Chassis Side Support](chassis-sidesupport.png)
+![Chassis Side Support](chassis-sideSupport.png)
 
 ## Drivetrain
 
