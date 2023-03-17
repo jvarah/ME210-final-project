@@ -1,3 +1,41 @@
+# Mechanical Designs
+
+## Drivetrain
+
+Our drivetrain was made from two pairs of differing wheels. The first pair were motor driven wheels that enabled the robot to drive and turn while the second pair were castor wheels that provided stability. These wheel pairs were laid out in the following manner:
+
+(insert picture)
+
+Our motors were chosen after calculating the minimal torque they needed to produce. For our initial calculations, we assumed that our robot would weigh 5 kg, our wheel radius was 5 cm, and that the maximum acceleration our robot would undergo was 1 m/s^2. Using a FBD approach, we then calculated that for our robot to undergo its maximum acceleration, each motor would need to produce a minimum torque of 0.125 Nm. After checking rm. 36’s stock, we found geared DC motors capable of producing up to 2.16 Nm of torque. As these motors met our required minimum torque requirements, we decided to go ahead and use them.
+
+In order to drive and support the motor driven wheels, the following configuration was used:
+
+![Drivetrain Exploded View](drivetrain-exploded.png)
+
+Component List:
+
+1: Motor
+
+2: Shaft Coupler
+
+3: Shaft Collar
+
+4: Ball Bearing
+
+5: D-Shaft
+
+6: Wheel
+
+In this configuration, the wheel was rigidly attached to the D-shaft. Power from the motor was transmitted to the wheel by rigidly connecting the D-shaft to the motor through a shaft coupler. Ball bearings and shaft collars were placed on both sides of the wheel to prevent the weight of the robot that the wheel supported from being transferred over to the motor shaft. This was important since non-axial loading would have damaged the motor. To further mitigate this damage source, flexible shaft couplers could have been used. Unfortunately, rm. 36 did not carry any in their stock any and is why flexible shaft couplers were not used in our design.
+
+Each motor was driven by its own L298 motor driver which was in turn driven by an Arduino through PWM. To maximize our motors’ torque output, two full bridges were run in parallel so each motor could maximize the current it could safely pull. We also powered our motors at their highest voltage rating of 12V.
+
+Overall, our drivetrain ran well and as expected. During the later stages of testing, our team experienced slipping issues as the wheels wore down, however, by wrapping electrical tape around the motor-driven wheels, this issue was resolved.
+
+(insert picture)
+
+
+
 # State Diagrams
 
 The overall strategy of our robot was to turn towards the IR beacon, stopping when we saw a certain amplitude of the filtered signal, then follow the line towards the bad press, followed by following the line to the good press and depositing two balls at each of those.
