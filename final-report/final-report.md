@@ -1,5 +1,28 @@
 # Mechanical Designs
 
+## Chassis
+Our chassis consisted of two layers. The first layer housed the drivetrain and electronics while the second layer housed our batteries and ball dropping mechanism. All chassis components were laser cut out of 1/8" thick duron sheets. T-slots located at each connection point allowed for 4-40 hardware to hold all components together. The chassis breakdown was as follows:
+
+![Chassis Exploded View](chassis-exploded.png)
+
+Component List:
+
+1: Chassis Top
+
+2: Chassis Bottom
+
+3: Motor Ball Bearing Side Support
+
+4: Motor Face Mount
+
+5: Motor Support
+
+6: Chassis Side Support
+
+All project members were also members of “Stanford Archery” at the time. To show off their club spirt and to add some pizzazz to the design, the Stanford Archery logo was laser cut into each of the chassis’s side supports.
+
+![Chassis Side Support](chassis-sideSupport.png)
+
 ## Drivetrain
 
 Our drivetrain was made from two pairs of differing wheels. The first pair were motor driven wheels that enabled the robot to drive and turn while the second pair were castor wheels that provided stability. These wheel pairs were laid out in the following manner:
