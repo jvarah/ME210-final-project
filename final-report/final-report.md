@@ -34,7 +34,67 @@ Overall, our drivetrain ran well and as expected. During the later stages of tes
 
 (insert picture)
 
+# Electrical Design
+Our electrical design primarily covers the tape sensing, IR beacon sensing, motor driver, Arduino pinout, and power regulation. The following subsections describes each in further detail.
 
+## Tape Sensing
+For tape sensing, we used four ITR20001/T sensors from Adafruit, which have a paired IR LED and phototransistor in a small housing. Each sensor was configured with a transresistive amplifier with outputs connected straight to the Arduino ADC pins. Below is the schematic for each tape sensor:
+
+![Tape Sensing Schema](tape_sensor_TRamp.jpeg)
+
+The IR LEDs were always driven on, allowing the Arduino to read a different steady-state analog signal when the tape sensor was above white ground, red tape, and black tape. The transresistive amplifier gain resistor was experimentally chosen to provide sufficient resolution.
+
+## IR Beacon Sensing
+To detect the IR beacon next to the Studio, we designed a multi-stage filter and amplifier circuit to output a steady-state analog value representing the strength of the square-wave beacon. 
+
+The Analog Filter Wizard by ADI was used to aid the design of the multi-stage filters.
+
+### High Level Architecture
+Below is the high level architecture for the IR beacon sensing. A single phototransistor configured in a transresistive amplifier receives the IR signal, which is passed through a high-pass filter (the prefilter) to remove ambient noise. A switch is used to choose which secondary beacon filter to pass through. The A Filter filters for the 3333Hz beacon, while the B Filter filters for the 909Hz beacon. The siganl is then converted to a steady-state value through the strength detector. Finally, another switch is used to direct the signal to the Arduino ADC pin.
+
+![IR Beacon Architecture](ir_beacon_architecture.jpeg)
+
+### Transresistive Amplifier and Prefilter (HPF)
+The first stage of the circuit includes a transresistive amplifier and a high-pass filter. The gain resistor was experimentally chosen to be able to detect the beacon within the Studio. The high-pass filter was designed with a passband above 500Hz and a stopband below 120Hz. A third-order Chebyshev filter was chosen to minimize the number of stages. A DC offset of 2.5V was added to the output of the high-pass filter.
+
+![IR TRamp Prefilter](ir_beacon_TRamp_prefilter.jpeg)
+
+### Beacon A (3333Hz) Filter
+A cascaded high-pass and low-pass filter was used to filter for Beacon A. The high-pass filter was designed with a stopband below 1kHz to filter out Beacon B. The low-pass filter was designed to attenuate the odd harmonics, with a stopband above 9kHz to filter out the third harmonic. 
+
+The third harmonic of Beacon B at 2727Hz posed a design challenge, as this was close to the Beacon A frequency of 3333Hz. A high-order filter would be required to severely attenuate the Beacon B third harmonic while passing the Beacon A fundamental. However, as the desired beacon filter can be chosen with the switch, and the beacons cannot be detected outside of the Studio, this did not pose an issue in the end.
+
+A fourth-order Chebyshev high-pass filter and a fourth-order Chebyshev low-pass filter were chosen to minimize the number of stages. The output of the Beacon A filter is a sinusoidal signal at 3333Hz centered around 2.5V.
+
+![IR Beacon A](ir_beacon_A_filter.jpeg)
+
+### Beacon B (909Hz) Filter
+A low-pass filter was used to filter for Beacon B, as the Prefilter already provides the high-pass filter. A fourth-order Chebyshev filter was chosen for the design. The output of the Beacon B filter is a sinusoidal signal at 909Hz centered around 2.5V.
+
+![IR Beacon B](ir_beacon_B_filter.jpeg)
+
+### Strength Detector (Comparator and LPF)
+In order to detect the strength of the signal, a comparator was used with a threshold set below 2.5V. As the amplitude of the sinusoidal signal increases, the duration of time that the signal is below the threshold also increases, and the duty cycle of the comparator output increases. Finally, to convert to a steady-state analog value, a second-order Butterworth low-pass filter was chosen.
+
+![IR Strength Detector](ir_beacon_strength_detector.jpeg)
+
+### Completed Protoboard
+The circuit was built using SMD components, several LM324 op amps, and a LM339 comparator on a protoboard using copper tape. As shown in the schematics above, the closest real component values were chosen based on availability. The stages were invidually tested before integration with one another, and the entire circuit was tested on the bench with a mock beacon before integration on the bot.
+
+![IR Beacon Protoboard](ir_beacon_protoboard.jpeg)
+
+## Motor Driver
+In order to drive the motors, we used the L298N breakout board from the stockroom. To maximize the current capability, we used one breakout board for each motor in parallel configuration. A 74HC14 inverter was used to simplify logic and reduce the number of signal wires to two: one for direction, and one for PWM enable.
+
+![Motor Driver Schema](motor_driver_schematic.jpeg)
+
+## Arduino Pinout
+The pinout for the Arduino in the final version of the bot is shown below. The ADC inputs from the IR beacon and tape sensors are located in the bottom left. The motor driver outputs and servo outputs are located on the right side, with pinouts chosen to ensure PWM capability. 
+
+![Arduino Pinout](arduino_uno_pinout.jpeg)
+
+## Power Regulation
+To power the robot, we wired the two 7.2V NiMH batteries in series for a nominal 14.4V supply. We then used a 20A adjustable buck converter from Amazon to step down to 12V for the motor power supply. For logic power, we used another 3A adjustable buck converter from Amazon to step down from 12V to 5V.  
 
 # State Diagrams
 
