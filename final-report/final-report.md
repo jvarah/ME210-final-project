@@ -1477,3 +1477,6 @@ typedef struct {
 
 #endif
 ```
+
+# Bill of Materials
+![BOM](BOM.png)
