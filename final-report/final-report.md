@@ -19,7 +19,7 @@ Component List:
 
 6: Chassis Side Support
 
-All project members were also members of “Stanford Archery” at the time. To show off their club spirt and to add some pizzazz to the design, the Stanford Archery logo was laser cut into each of the chassis’s side supports.
+All project members were also members of “Stanford Archery” at the time. To show off their club spirt and to add some pizzazz to their design, the Stanford Archery logo was cut into each of the chassis’s side supports.
 
 ![Chassis Side Support](chassis-sideSupport.png)
 
@@ -27,7 +27,7 @@ All project members were also members of “Stanford Archery” at the time. To 
 
 Our drivetrain was made from two pairs of differing wheels. The first pair were motor driven wheels that enabled the robot to drive and turn while the second pair were castor wheels that provided stability. These wheel pairs were laid out in the following manner:
 
-(insert picture)
+![Taped-up wheel](wheel-layout.jpg)
 
 Our motors were chosen after calculating the minimal torque they needed to produce. For our initial calculations, we assumed that our robot would weigh 5 kg, our wheel radius was 5 cm, and that the maximum acceleration our robot would undergo was 1 m/s^2. Using a FBD approach, we then calculated that for our robot to undergo its maximum acceleration, each motor would need to produce a minimum torque of 0.125 Nm. After checking rm. 36’s stock, we found geared DC motors capable of producing up to 2.16 Nm of torque. As these motors met our required minimum torque requirements, we decided to go ahead and use them.
 
@@ -53,9 +53,9 @@ In this configuration, the wheel was rigidly attached to the D-shaft. Power from
 
 Each motor was driven by its own L298 motor driver which was in turn driven by an Arduino through PWM. To maximize our motors’ torque output, two full bridges were run in parallel so each motor could maximize the current it could safely pull. We also powered our motors at their highest voltage rating of 12V.
 
-Overall, our drivetrain ran well and as expected. During the later stages of testing, our team experienced slipping issues as the wheels wore down, however, by wrapping electrical tape around the motor-driven wheels, this issue was resolved.
+Overall, our drivetrain ran well. During the later stages of testing, our team experienced slipping issues as the wheels wore down, however, by wrapping yellow electrical tape around the motor-driven wheels, this issue was resolved.
 
-(insert picture)
+![Taped-up wheel](wheel-taped.jpg)
 
 # Electrical Design
 Our electrical design primarily covers the tape sensing, IR beacon sensing, motor driver, Arduino pinout, and power regulation. The following subsections describes each in further detail.
