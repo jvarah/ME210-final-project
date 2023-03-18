@@ -2,7 +2,7 @@
     <html>
     <head>
         <meta charset="UTF-8">
-        <title>State Diagrams</title>
+        <title>Team Hunger Games</title>
         <style>
 /* From extension vscode.github */
 /*---------------------------------------------------------------------------------------------
@@ -40,7 +40,83 @@
         
     </head>
     <body class="vscode-body vscode-light">
-        <h1 id="state-diagrams">State Diagrams</h1>
+        <h1 id="team-hunger-games">Team Hunger Games</h1>
+<p>In this report, we discuss the design of our robot for the ME210 Winter 2023 RobOSCARS.</p>
+<p>To accomplish the task of delivering good PRESS to our FILM and bad PRESS to our opponent's FILM, we chose to design a line-following robot with a ball-dropping mechanism to deliver the PRESS.</p>
+<p>Our report covers the mechanical design, electrical design, state diagrams, and final code.</p>
+<p><img src="file:////Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/final-report/robot_picture.jpeg" alt="Hero Shot"></p>
+<h1 id="mechanical-designs">Mechanical Designs</h1>
+<h2 id="chassis">Chassis</h2>
+<p>Our chassis consisted of two layers. The first layer housed the drivetrain and electronics while the second layer housed our batteries and ball dropping mechanism. All chassis components were laser cut out of 1/8&quot; thick duron sheets. T-slots located at each connection point allowed for 4-40 hardware to hold all components together. The chassis breakdown was as follows:</p>
+<p><img src="file:////Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/final-report/chassis-exploded.png" alt="Chassis Exploded View"></p>
+<p>Component List:</p>
+<p>1: Chassis Top</p>
+<p>2: Chassis Bottom</p>
+<p>3: Motor Ball Bearing Side Support</p>
+<p>4: Motor Face Mount</p>
+<p>5: Motor Support</p>
+<p>6: Chassis Side Support</p>
+<p>All project members were also members of “Stanford Archery” at the time. To show off their club spirit and to add some pizzazz to their design, the Stanford Archery logo was cut into each of the chassis’s side supports.</p>
+<p><img src="file:////Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/final-report/chassis-sideSupport.png" alt="Chassis Side Support"></p>
+<h2 id="drivetrain">Drivetrain</h2>
+<p>Our drivetrain was made from two pairs of differing wheels. The first pair were motor driven wheels that enabled the robot to drive and turn while the second pair were castor wheels that provided stability. These wheel pairs were laid out in the following manner:</p>
+<p><img src="file:////Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/final-report/wheel-layout.jpg" alt="Taped-up wheel"></p>
+<p>Our motors were chosen after calculating the minimal torque they needed to produce. For our initial calculations, we assumed that our robot would weigh 5 kg, our wheel radius was 5 cm, and that the maximum acceleration our robot would undergo was 1 m/s^2. Using a FBD approach, we then calculated that for our robot to undergo its maximum acceleration, each motor would need to produce a minimum torque of 0.125 Nm. After checking rm. 36’s stock, we found geared DC motors capable of producing up to 2.16 Nm of torque. As these motors met our required minimum torque requirements, we decided to go ahead and use them.</p>
+<p>In order to drive and support the motor driven wheels, the following configuration was used:</p>
+<p><img src="file:////Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/final-report/drivetrain-exploded.png" alt="Drivetrain Exploded View"></p>
+<p>Component List:</p>
+<p>1: Motor</p>
+<p>2: Shaft Coupler</p>
+<p>3: Shaft Collar</p>
+<p>4: Ball Bearing</p>
+<p>5: D-Shaft</p>
+<p>6: Wheel</p>
+<p>In this configuration, the wheel was rigidly attached to the D-shaft. Power from the motor was transmitted to the wheel by rigidly connecting the D-shaft to the motor through a shaft coupler. Ball bearings and shaft collars were placed on both sides of the wheel to prevent the weight of the robot that the wheel supported from being transferred over to the motor shaft. This was important since non-axial loading would have damaged the motor. To further mitigate this damage source, flexible shaft couplers could have been used. Unfortunately, rm. 36 did not carry any in their stock any and is why flexible shaft couplers were not used in our design.</p>
+<p>Each motor was driven by its own L298N motor driver which was in turn driven by an Arduino through PWM. To maximize our motors’ torque output, two full bridges were run in parallel so each motor could maximize the current it could safely pull. We also powered our motors at their highest voltage rating of 12V.</p>
+<p>Overall, our drivetrain ran well. During the later stages of testing, our team experienced slipping issues as the wheels wore down, however, by wrapping yellow electrical tape around the motor-driven wheels, this issue was resolved.</p>
+<p><img src="file:////Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/final-report/wheel-taped.jpg" alt="Taped-up wheel"></p>
+<h2 id="dropping-mechanism">Dropping Mechanism</h2>
+<p>To carrry and drop the PRESS balls we designed a simple cylinder type holder with mounts for a servo. The servo, which had a bent paperclip attached to it, served as the gate to hold and selectively drop the PRESS balls. Also mounted to the dropping mechanism was another servo that we used to wave to the paparazzi to indicate the match had begun. To do this we taped the servo to the support and taped a wire to the end of the actuator on the servo.</p>
+<p><img src="file:////Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/final-report/dropper.png" alt="Dopper Mech">
+<img src="file:////Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/final-report/paperclip.png" alt="Paperclip"></p>
+<h1 id="electrical-design">Electrical Design</h1>
+<p>Our electrical design primarily covers the tape sensing, IR beacon sensing, motor driver, Arduino pinout, and power regulation. The following subsections describes each in further detail.</p>
+<h2 id="tape-sensing">Tape Sensing</h2>
+<p>For tape sensing, we used four ITR20001/T sensors from Adafruit, which have a paired IR LED and phototransistor in a small housing. Each sensor was configured with a transresistive amplifier with outputs connected straight to the Arduino ADC pins. Below is the schematic for each tape sensor:</p>
+<p><img src="file:////Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/final-report/tape_sensor_TRamp.jpeg" alt="Tape Sensing Schema"></p>
+<p>The IR LEDs were always driven on, allowing the Arduino to read a different steady-state analog signal when the tape sensor was above white ground, red tape, and black tape. The transresistive amplifier gain resistor was experimentally chosen to provide sufficient resolution.</p>
+<h2 id="ir-beacon-sensing">IR Beacon Sensing</h2>
+<p>To detect the IR beacon next to the Studio, we designed a multi-stage filter and amplifier circuit to output a steady-state analog value representing the strength of the square-wave beacon.</p>
+<p>The Analog Filter Wizard by ADI was used to aid the design of the multi-stage filters.</p>
+<h3 id="high-level-architecture">High Level Architecture</h3>
+<p>Below is the high level architecture for the IR beacon sensing. A single phototransistor configured in a transresistive amplifier receives the IR signal, which is passed through a high-pass filter (the prefilter) to remove ambient noise. A switch is used to choose which secondary beacon filter to pass through. The A Filter filters for the 3333Hz beacon, while the B Filter filters for the 909Hz beacon. The siganl is then converted to a steady-state value through the strength detector. Finally, another switch is used to direct the signal to the Arduino ADC pin.</p>
+<p><img src="file:////Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/final-report/ir_beacon_architecture.jpeg" alt="IR Beacon Architecture"></p>
+<h3 id="transresistive-amplifier-and-prefilter-hpf">Transresistive Amplifier and Prefilter (HPF)</h3>
+<p>The first stage of the circuit includes a transresistive amplifier and a high-pass filter. The gain resistor was experimentally chosen to be able to detect the beacon within the Studio. The high-pass filter was designed with a passband above 500Hz and a stopband below 120Hz. A third-order Chebyshev filter was chosen to minimize the number of stages. A DC offset of 2.5V was added to the output of the high-pass filter.</p>
+<p><img src="file:////Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/final-report/ir_beacon_TRamp_prefilter.jpeg" alt="IR TRamp Prefilter"></p>
+<h3 id="beacon-a-3333hz-filter">Beacon A (3333Hz) Filter</h3>
+<p>A cascaded high-pass and low-pass filter was used to filter for Beacon A. The high-pass filter was designed with a stopband below 1kHz to filter out Beacon B. The low-pass filter was designed to attenuate the odd harmonics, with a stopband above 9kHz to filter out the third harmonic.</p>
+<p>The third harmonic of Beacon B at 2727Hz posed a design challenge, as this was close to the Beacon A frequency of 3333Hz. A high-order filter would be required to severely attenuate the Beacon B third harmonic while passing the Beacon A fundamental. However, as the desired beacon filter can be chosen with the switch, and the beacons cannot be detected outside of the Studio, this did not pose an issue in the end.</p>
+<p>A fourth-order Chebyshev high-pass filter and a fourth-order Chebyshev low-pass filter were chosen to minimize the number of stages. The output of the Beacon A filter is a sinusoidal signal at 3333Hz centered around 2.5V.</p>
+<p><img src="file:////Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/final-report/ir_beacon_A_filter.jpeg" alt="IR Beacon A"></p>
+<h3 id="beacon-b-909hz-filter">Beacon B (909Hz) Filter</h3>
+<p>A low-pass filter was used to filter for Beacon B, as the Prefilter already provides the high-pass filter. A fourth-order Chebyshev filter was chosen for the design. The output of the Beacon B filter is a sinusoidal signal at 909Hz centered around 2.5V.</p>
+<p><img src="file:////Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/final-report/ir_beacon_B_filter.jpeg" alt="IR Beacon B"></p>
+<h3 id="strength-detector-comparator-and-lpf">Strength Detector (Comparator and LPF)</h3>
+<p>In order to detect the strength of the signal, a comparator was used with a threshold set below 2.5V. As the amplitude of the sinusoidal signal increases, the duration of time that the signal is below the threshold also increases, and the duty cycle of the comparator output increases. Finally, to convert to a steady-state analog value, a second-order Butterworth low-pass filter was chosen.</p>
+<p><img src="file:////Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/final-report/ir_beacon_strength_detector.jpeg" alt="IR Strength Detector"></p>
+<h3 id="completed-protoboard">Completed Protoboard</h3>
+<p>The circuit was built using SMD components, several LM324 op amps, and a LM339 comparator on a protoboard using copper tape. As shown in the schematics above, the closest real component values were chosen based on availability. The stages were invidually tested before integration with one another, and the entire circuit was tested on the bench with a mock beacon before integration on the bot.</p>
+<p><img src="file:////Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/final-report/ir_beacon_protoboard.jpeg" alt="IR Beacon Protoboard"></p>
+<h2 id="motor-driver">Motor Driver</h2>
+<p>In order to drive the motors, we used the L298N breakout board from the stockroom. To maximize the current capability, we used one breakout board for each motor in parallel configuration. A 74HC14 inverter was used to simplify logic and reduce the number of signal wires to two: one for direction, and one for PWM enable.</p>
+<p><img src="file:////Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/final-report/motor_driver_schematic.jpeg" alt="Motor Driver Schema"></p>
+<h2 id="arduino-pinout">Arduino Pinout</h2>
+<p>The pinout for the Arduino in the final version of the bot is shown below. The ADC inputs from the IR beacon and tape sensors are located in the bottom left. The motor driver outputs and servo outputs are located on the right side, with pinouts chosen to ensure PWM capability.</p>
+<p><img src="file:////Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/final-report/arduino_uno_pinout.jpeg" alt="Arduino Pinout"></p>
+<h2 id="power-regulation">Power Regulation</h2>
+<p>To power the robot, we wired the two 7.2V NiMH batteries in series for a nominal 14.4V supply. We then used a 20A adjustable buck converter from Amazon to step down to 12V for the motor power supply. For logic power, we used another 3A adjustable buck converter from Amazon to step down from 12V to 5V.</p>
+<h1 id="state-diagrams">State Diagrams</h1>
 <p>The overall strategy of our robot was to turn towards the IR beacon, stopping when we saw a certain amplitude of the filtered signal, then follow the line towards the bad press, followed by following the line to the good press and depositing two balls at each of those.</p>
 <p>Our dispensing mechanism was a tube of four press, with one servo at the bottom which prevented the press from falling out. We could drop two press only by opening and closing the servo at a specific time. Originally, our finite state machines assumed that we would have two servos to form a kind of airlock system, having only one press to drop at a time.</p>
 <p>We had also wanted to use an IMU for more consistent turning, but removed it to avoid additional points of failure on our robot. Instead, we turned for approximate amounts of time and depended on sensing the tape.</p>
@@ -54,12 +130,12 @@
 <li>Follow the red tape</li>
 </ul>
 <p>Original FSM included turning 360 degrees to read the highest IR value, then turn towards it, and then detect the black tape to determine when we had left the studio
-<img src="file:///d:\ME210\ME210-final-project\final-report\exit-studio.jpg" alt="Exit studio FSM"></p>
+<img src="file:////Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/final-report/exit-studio.jpg" alt="Exit studio FSM"></p>
 <p>The following image is our initial FSM for leaving the studio.</p>
 <h2 id="dispensing-press">Dispensing Press</h2>
 <p>For our final code, we opened the bottom servo (only one required) for a set number of milliseconds, then closed the servo.</p>
 <p>The following image is our initial FSM for dispesning one press
-<img src="file:///d:\ME210\ME210-final-project\final-report\dispense-press.jpg" alt="Dispensing Press FSM"></p>
+<img src="file:////Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/final-report/dispense-press.jpg" alt="Dispensing Press FSM"></p>
 <h2 id="line-follow">Line Follow</h2>
 <p>Our final code used a simplified approach to line follow:</p>
 <ul>
@@ -68,11 +144,11 @@
 <li>Otherwise, turn right by setting left motor to half power, right motor to 0</li>
 </ul>
 <p>Here is our original FSM, which employed P-only closed loop control (using difference between the left/right and center sensors as the error)
-<img src="file:///d:\ME210\ME210-final-project\final-report\line-follow.jpg" alt="Line Follow FSM"></p>
+<img src="file:////Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/final-report/line-follow.jpg" alt="Line Follow FSM"></p>
 <h2 id="full-fsm-for-checkoff">Full FSM for Checkoff</h2>
 <p>Again, this image is the FSM that references the above state machines, to ultimately complete the goal of dispensing two press in the good press, and then two in the bad press</p>
 <p>For our final code, we ended up traveling to the bad press first to throw off opponents who needed the press scales to be level for scoring. We also used timers to replace the gyro, and a simpler line follow method, as described in the line follow section.</p>
-<p><img src="file:///d:\ME210\ME210-final-project\final-report\checkoff-fsm.jpg" alt="Final FSM"></p>
+<p><img src="file:////Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/final-report/checkoff-fsm.jpg" alt="Final FSM"></p>
 <h1 id="code">Code</h1>
 <p>Under lib/, we have libraries for each of the main subsystems on our robot. These are abstractions so the <code>main.cpp</code> file can easily call methods like <code>getLineFollowPowers()</code> and <code>setLeftPower()</code> rather than worrying about manual calls to <code>analogWrite()</code> or <code>analogRead()</code></p>
 <p>All of the FSM logic is in <code>main.cpp</code></p>
@@ -1454,6 +1530,8 @@ LineFollow::<span class="hljs-built_in">LineFollow</span>(<span class="hljs-type
 
 <span class="hljs-meta">#<span class="hljs-keyword">endif</span></span>
 </code></pre>
+<h1 id="bill-of-materials">Bill of Materials</h1>
+<p><img src="file:////Users/jamesvarah/Desktop/School/Sophomore Year/Winter 2023/ME210/ME210-final-project/final-report/BOM.png" alt="BOM"></p>
 
         
         
