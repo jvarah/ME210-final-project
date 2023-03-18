@@ -1,3 +1,12 @@
+# Team Hunger Games
+In this report, we discuss the design of our robot for the ME210 Winter 2023 RobOSCARS. 
+
+To accomplish the task of delivering good PRESS to our FILM and bad PRESS to our opponent's FILM, we chose to design a line-following robot with a ball-dropping mechanism to deliver the PRESS. 
+
+Our report covers the mechanical design, electrical design, state diagrams, and final code.
+
+![Hero Shot](robot_picture.jpeg)
+
 # Mechanical Designs
 
 ## Chassis
@@ -19,7 +28,7 @@ Component List:
 
 6: Chassis Side Support
 
-All project members were also members of “Stanford Archery” at the time. To show off their club spirt and to add some pizzazz to their design, the Stanford Archery logo was cut into each of the chassis’s side supports.
+All project members were also members of “Stanford Archery” at the time. To show off their club spirit and to add some pizzazz to their design, the Stanford Archery logo was cut into each of the chassis’s side supports.
 
 ![Chassis Side Support](chassis-sideSupport.png)
 
@@ -51,7 +60,7 @@ Component List:
 
 In this configuration, the wheel was rigidly attached to the D-shaft. Power from the motor was transmitted to the wheel by rigidly connecting the D-shaft to the motor through a shaft coupler. Ball bearings and shaft collars were placed on both sides of the wheel to prevent the weight of the robot that the wheel supported from being transferred over to the motor shaft. This was important since non-axial loading would have damaged the motor. To further mitigate this damage source, flexible shaft couplers could have been used. Unfortunately, rm. 36 did not carry any in their stock any and is why flexible shaft couplers were not used in our design.
 
-Each motor was driven by its own L298 motor driver which was in turn driven by an Arduino through PWM. To maximize our motors’ torque output, two full bridges were run in parallel so each motor could maximize the current it could safely pull. We also powered our motors at their highest voltage rating of 12V.
+Each motor was driven by its own L298N motor driver which was in turn driven by an Arduino through PWM. To maximize our motors’ torque output, two full bridges were run in parallel so each motor could maximize the current it could safely pull. We also powered our motors at their highest voltage rating of 12V.
 
 Overall, our drivetrain ran well. During the later stages of testing, our team experienced slipping issues as the wheels wore down, however, by wrapping yellow electrical tape around the motor-driven wheels, this issue was resolved.
 
