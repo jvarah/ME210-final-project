@@ -57,6 +57,13 @@ Overall, our drivetrain ran well and as expected. During the later stages of tes
 
 (insert picture)
 
+## Dropping Mechanism
+
+To carrry and drop the PRESS balls we designed a simple cylinder type holder with mounts for a servo. The servo, which had a bent paperclip attached to it, served as the gate to hold and selectively drop the PRESS balls. Also mounted to the dropping mechanism was another servo that we used to wave to the paparazzi to indicate the match had begun. To do this we taped the servo to the support and taped a wire to the end of the actuator on the servo. 
+
+![Dopper Mech](dropper.png)
+![Paperclip](paperclip.png)
+
 # Electrical Design
 Our electrical design primarily covers the tape sensing, IR beacon sensing, motor driver, Arduino pinout, and power regulation. The following subsections describes each in further detail.
 
